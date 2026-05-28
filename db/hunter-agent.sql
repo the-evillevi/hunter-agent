@@ -43,7 +43,7 @@ CREATE TABLE jobs (
 	source_id INTEGER NOT NULL REFERENCES sources(id),
 	description TEXT,
 	hash TEXT UNIQUE,
-	scraped_at DATE,
+	scraped_at DATETIME,
 	score INT CHECK(score BETWEEN 1 AND 100),
 	score_reasoning TEXT
 );
@@ -53,8 +53,8 @@ CREATE TABLE applications (
 	job_id INT,
 	cv_path TEXT,
 	status TEXT CHECK(status IN ('pending', 'draft', 'applied', 'acknowledged', 'interviews', 'rejected', 'ghosted', 'offer', 'accepted')),
-	applied_at DATE,
-	last_updated DATE,
+	applied_at DATETIME,
+	last_updated DATETIME,
 	notes TEXT,
 
 	FOREIGN KEY (job_id) REFERENCES jobs (id)
@@ -65,7 +65,7 @@ CREATE TABLE blacklist (
 	company_id INTEGER REFERENCES companies(id),
 	job_id INTEGER REFERENCES jobs(id),
 	reason TEXT,
-	added_at DATE,
+	added_at DATETIME,
 	CHECK (
 		(company_id IS NOT NULL AND job_id IS NULL)
 		OR
