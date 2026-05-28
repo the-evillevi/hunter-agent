@@ -1,0 +1,136 @@
+# ============================================================
+# hunter-agent — master configuration
+# ============================================================
+
+[agent]
+name = "hunter-agent"
+version = "0.1.0"
+db_path = "./db/hunter-agent.db"
+cv_master = "./cv/master.docx"
+cv_output = "./cv/tailored/"
+log_level = "INFO"               # DEBUG | INFO | WARNING
+
+
+# ============================================================
+# SCHEDULER
+# ============================================================
+
+[scheduler]
+enabled = true
+runs_at = ["08:00", "18:00"]
+timezone = "America/Mexico_City"
+lock_file = "/tmp/hunter-agent.lock"
+
+
+# ============================================================
+# LOCAL AI - OLLAMA
+# ============================================================
+
+[ollama]
+base_url = "http://localhost:11434"
+
+[ollama.scorer]
+model = "qwen2.5:7b"
+temperature = 0.1    # low = consistent, quasi-deterministic scores
+max_tokens = 512     # scores + reasoning don't need more
+
+[ollama.tailor]
+model = "qwen2.5:14b"
+temperature = 0.3     # slight creativity for rewriting
+max_tokens = 2048     # full CV section rewrites
+
+
+# ============================================================
+# JOB PROFILES
+# 2-3 roles I'm targetting, each has its own keywords,
+# salary floor and match threshold.
+# ============================================================
+
+[[profiles]]
+role_name = "AI Engineer"
+active = true
+match_threshold = 80 # auto-apply only at or above this score
+salary_min = 60000 # in MXN/month (or 0 to disable filter)
+location_type = ["remote", "hybrid"]
+keywords = [
+  "AI engineer",
+  "machine learning engineer",
+  "LLM",
+  "RAG",
+  "fine-tuning",
+  "MLOps",
+  "Python",
+  "PyTorch",
+]
+exclude_keywords = ["PhD required", "security clearance", "on-site only"]
+
+[[profiles]]
+role_name = "Senior Fullstack Engineer"
+active = true
+match_threshold = 80
+salary_min = 60000
+location_type = "hybrid"
+keywords = [
+  "fullstack",
+  "full-stack",
+  "React",
+  "Node.js",
+  "TypeScript",
+  "REST API",
+  "PostgreSQL",
+  "Next",
+  "Next.js",
+  "Astro",
+]
+exclude_keywords = ["gaming", "blockchain", "web3"]
+
+
+# ============================================================
+# JOB SOURCES
+# Toggle sources on/off without touching code.
+# ============================================================
+
+[sources]
+
+[sources.adzuna]
+enabled = true
+app_id = "YOUR_ADZUNA_APP_ID"   # free at developer.adzuna.com
+app_key = "YOUR_ADZUNA_APP_KEY"
+country = "gb"                  # gb | us | ca | au | de | fr
+results_per_page = 50
+max_pages = 5                   # 250 jobs per profile per run
+
+[sources.remotive]
+enabled = true
+# No API key needed — fully public REST API
+
+[sources.linkedin]
+enabled = false # start false — enable once stable
+# Uses Playwright with your logged-in session cookie
+# Set to true only after Adzuna + Remotive are working
+session_cookie = "" # li_at cookie value from browser
+
+
+# ============================================================
+# APPLICATION ENGINE
+# ============================================================
+
+[application]
+
+# Master answers to standard form questions.
+# Playwright will match field labels and fill these in.
+[application.form_defaults]
+full_name = "Your Full Name"
+email = "you@email.com"
+phone = "+52 XXX XXX XXXX"
+location = "Mexico (Remote)"
+linkedin_url = "https://linkedin.com/in/yourhandle"
+github_url = "https://github.com/yourhandle"
+portfolio_url = ""
+years_experience = 5
+salary_expectation = "80000"                        # in job's local currency
+right_to_work = true
+requires_sponsorship = false
+willing_to_relocate = false
+notice_period_days = 30
+preferred_start = "immediately"
