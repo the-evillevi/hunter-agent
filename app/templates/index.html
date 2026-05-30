@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>Tracked jobs</h2>
+        <p>These rows come from SQLite. The scraper will add more later.</p>
+      </div>
+
+      <button
+        type="button"
+        hx-get="/jobs"
+        hx-target="#jobs-list"
+        hx-swap="innerHTML"
+      >
+        Refresh
+      </button>
+    </div>
+
+    <div id="jobs-list">
+      {% include "jobs.html" %}
+    </div>
+  </section>
+{% endblock %}

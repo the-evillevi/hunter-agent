@@ -1,0 +1,143 @@
+/* Basic styling for the learning skeleton.
+   TODO: Keep this simple until the data model and workflows settle. */
+
+:root {
+  color-scheme: light;
+  --bg: #f7f7f4;
+  --panel: #ffffff;
+  --text: #1f2933;
+  --muted: #667085;
+  --line: #d9dee3;
+  --accent: #0f766e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.site-header,
+.page {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32px 0 20px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: 2rem;
+}
+
+.header-link,
+a {
+  color: var(--accent);
+  font-weight: 650;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.section-heading,
+.job-card,
+.job-actions {
+  display: flex;
+  align-items: center;
+}
+
+.section-heading,
+.job-card {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.section-heading p,
+.job-card p {
+  color: var(--muted);
+}
+
+button {
+  border: 0;
+  border-radius: 6px;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.job-list {
+  display: grid;
+  gap: 12px;
+}
+
+.job-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.job-card h3 {
+  margin-bottom: 6px;
+}
+
+.job-card p {
+  margin-bottom: 0;
+}
+
+.job-actions {
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.score {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  padding: 4px 8px;
+}
+
+.empty-state {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+@media (max-width: 640px) {
+  .site-header,
+  .section-heading,
+  .job-card {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

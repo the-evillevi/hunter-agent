@@ -1,0 +1,26 @@
+{% if jobs %}
+  <div class="job-list">
+    {% for job in jobs %}
+      <article class="job-card">
+        <div>
+          <h3>{{ job.title }}</h3>
+          <p>{{ job.company }} · {{ job.location }} · {{ job.source }}</p>
+        </div>
+
+        <div class="job-actions">
+          {% if job.score is not none %}
+            <span class="score">{{ job.score }}/100</span>
+          {% endif %}
+
+          {% if job.url %}
+            <a href="{{ job.url }}" target="_blank" rel="noreferrer">Open</a>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="empty-state">
+    No jobs found yet. TODO: run seed data or implement the first scraper.
+  </p>
+{% endif %}

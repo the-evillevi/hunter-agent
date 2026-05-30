@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>hunter-agent</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <!-- HTMX lets server-rendered HTML feel interactive without a frontend build step. -->
+    <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <div>
+        <p class="eyebrow">Job scraping agent</p>
+        <h1>hunter-agent</h1>
+      </div>
+      <a class="header-link" href="/health">Health</a>
+    </header>
+
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -5,7 +5,7 @@
 [agent]
 name = "hunter-agent"
 version = "0.1.0"
-db_path = "./db/hunter-agent.db"
+db_path = "./app/db/hunter-agent.db"
 cv_master = "./cv/master.docx"
 cv_output = "./cv/tailored/"
 log_level = "INFO"               # DEBUG | INFO | WARNING
