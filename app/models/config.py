@@ -72,7 +72,10 @@ class ProfileConfig(StrictConfigModel):
     active: bool
     match_threshold: int = Field(ge=1, le=100)
     salary_min: int = Field(ge=0)
-    location_type: Literal["remote", "hybrid", "onsite"] | list[Literal["remote", "hybrid", "onsite"]]
+    location_type: (
+        Literal["remote", "hybrid", "onsite"]
+        | list[Literal["remote", "hybrid", "onsite"]]
+    )
     keywords: list[str] = Field(min_length=1)
     exclude_keywords: list[str] = Field(default_factory=list)
 

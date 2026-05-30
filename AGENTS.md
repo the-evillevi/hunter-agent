@@ -51,6 +51,11 @@ Run tests:
 uv run pytest
 ```
 
+Always run ruff auto-formatter after finishing a change:
+```sh
+uvx ruff format
+```
+
 ## Coding Style & Naming Conventions
 
 Use Python 3.14, four-space indentation, SQLModel for database access, and Pydantic for validation at boundaries such as `config.toml`, forms, and scraper payloads. Keep modules small and beginner-readable. Prefer explicit function names such as `list_jobs`, `get_session`, and `scrape_jobs`.

@@ -11,4 +11,7 @@ def test_list_jobs_returns_seeded_jobs() -> None:
         jobs = list_jobs(session)
 
     assert len(jobs) >= 2
-    assert {job.title for job in jobs} >= {"AI/ML Engineer", "Senior Fullstack Engineer"}
+    assert {job.title for job in jobs} >= {
+        "AI/ML Engineer",
+        "Senior Fullstack Engineer",
+    }

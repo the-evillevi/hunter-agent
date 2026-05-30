@@ -3,7 +3,6 @@ from fastapi.staticfiles import StaticFiles
 
 from app.routes import health, jobs
 
-
 app = FastAPI(title="hunter-agent")
 
 # Static files are plain browser assets: CSS, images, and later small scripts.
