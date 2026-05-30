@@ -1,19 +1,81 @@
-"""Job data shapes.
+"""Job database and display models.
 
-The database is still the source of truth. This dataclass is here so beginners
-can see what fields a "job" has without jumping into SQL first.
+SQLModel classes with `table=True` map to SQLite tables. Plain SQLModel classes
+without `table=True` are useful response/view shapes.
 """
 
-from dataclasses import dataclass
+from datetime import datetime
+
+from sqlmodel import Field, SQLModel
 
 
-@dataclass(frozen=True)
-class Job:
-    """A simple view of a job listing shown in the web UI.
+class Company(SQLModel, table=True):
+    """Company table from sql/hunter-agent.sql."""
 
-    TODO: Add fields as your scraper starts collecting salary, tags, and source
-    metadata that you want to display.
+    __tablename__ = "companies"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+
+class Location(SQLModel, table=True):
+    """Location table from sql/hunter-agent.sql."""
+
+    __tablename__ = "locations"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+
+class Source(SQLModel, table=True):
+    """Job source table from sql/hunter-agent.sql."""
+
+    __tablename__ = "sources"
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str = Field(unique=True)
+
+
+class Profile(SQLModel, table=True):
+    """Minimal profile table model needed by JobRecord's foreign key.
+
+    TODO: Expand this when you build profile management screens.
     """
+
+    __tablename__ = "profiles"
+
+    id: int | None = Field(default=None, primary_key=True)
+    role_name: str | None = None
+    salary_min: int | None = None
+    location_type: str | None = None
+    match_threshold: int | None = None
+    active: bool | None = None
+
+
+class JobRecord(SQLModel, table=True):
+    """Jobs table from sql/hunter-agent.sql.
+
+    TODO: Add SQLModel relationships after you are comfortable with joins.
+    """
+
+    __tablename__ = "jobs"
+
+    id: int | None = Field(default=None, primary_key=True)
+    profile_id: int = Field(foreign_key="profiles.id")
+    title: str | None = None
+    company_id: int = Field(foreign_key="companies.id")
+    location_id: int = Field(foreign_key="locations.id")
+    url: str | None = Field(default=None, unique=True)
+    source_id: int = Field(foreign_key="sources.id")
+    description: str | None = None
+    hash: str | None = Field(default=None, unique=True)
+    scraped_at: datetime | None = None
+    score: int | None = None
+    score_reasoning: str | None = None
+
+
+class JobListItem(SQLModel):
+    """Display shape for one job card in the HTMX template."""
 
     id: int
     title: str

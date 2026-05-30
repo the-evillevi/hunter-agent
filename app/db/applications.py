@@ -1,24 +1,27 @@
-"""Early application-query helpers.
+"""Application-query helpers.
 
-This file preserves the first database experiment, but makes it safer:
-the caller provides the connection, and the shared database module decides
-where the SQLite file lives.
+This file is not used by the current UI yet. It is kept as a placeholder for
+the future applications page, using SQLModel sessions instead of raw sqlite3.
 """
 
-from sqlite3 import Connection, Row
+from sqlalchemy import text
+from sqlmodel import Session
 
 
-def get_applications(connection: Connection) -> list[Row]:
+def get_applications(session: Session) -> list[dict]:
     """Return recent application rows.
 
-    TODO: Join this with the jobs table when you build an applications page.
+    TODO: Replace this text query with SQLModel table models when you build the
+    applications page.
     """
-    cursor = connection.execute(
-        """
+    rows = session.exec(
+        text(
+            """
         SELECT *
         FROM applications
         ORDER BY last_updated DESC
         LIMIT 100
         """
-    )
-    return cursor.fetchall()
+        )
+    ).mappings()
+    return [dict(row) for row in rows]

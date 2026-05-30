@@ -1,0 +1,14 @@
+{
+  "name": "hunter-agent",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "scripts": {
+    "css:build": "tailwindcss -i ./app/static/tailwind.css -o ./app/static/styles.css --minify",
+    "css:watch": "tailwindcss -i ./app/static/tailwind.css -o ./app/static/styles.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.17",
+    "tailwindcss": "^4.1.17"
+  }
+}

@@ -1,0 +1,8 @@
+packages:
+  - "."
+
+# pnpm 11 requires every dependency build script to be explicitly reviewed.
+# Tailwind's watcher dependency is optional for our production CSS build, so we
+# deny its install script instead of approving native code execution.
+allowBuilds:
+  "@parcel/watcher": false

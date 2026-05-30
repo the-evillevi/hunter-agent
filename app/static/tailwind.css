@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+/*
+  Tailwind scans these files to find class names used by Jinja templates.
+  TODO: Add more @source lines if you create templates outside app/templates/.
+*/
+@source "../templates/**/*.html";

@@ -1,49 +1,47 @@
 """Job storage and lookup helpers.
 
-This file is the bridge between route handlers and SQLite queries. Keeping SQL
-here prevents HTML routes from becoming hard to read as the app grows.
+This file is the bridge between route handlers and SQLModel queries. Keeping
+database access here prevents HTML routes from becoming hard to read.
 """
 
-from sqlite3 import Connection
+from sqlmodel import Session, select
 
-from app.models.job import Job
+from app.models.job import Company, JobListItem, JobRecord, Location, Source
 
 
-def list_jobs(connection: Connection, limit: int = 25) -> list[Job]:
+def list_jobs(session: Session, limit: int = 25) -> list[JobListItem]:
     """Return recent jobs for the home page.
 
     This is intentionally read-only. Later you can add functions like
     `save_scraped_job()` and `mark_job_applied()` beside it.
     """
-    cursor = connection.execute(
-        """
-        SELECT
-            jobs.id,
-            jobs.title,
-            companies.name AS company,
-            locations.name AS location,
-            sources.name AS source,
-            jobs.score,
-            jobs.url
-        FROM jobs
-        JOIN companies ON companies.id = jobs.company_id
-        JOIN locations ON locations.id = jobs.location_id
-        JOIN sources ON sources.id = jobs.source_id
-        ORDER BY jobs.scraped_at DESC, jobs.id DESC
-        LIMIT ?
-        """,
-        (limit,),
+    statement = (
+        select(
+            JobRecord.id,
+            JobRecord.title,
+            Company.name,
+            Location.name,
+            Source.name,
+            JobRecord.score,
+            JobRecord.url,
+        )
+        .join(Company, Company.id == JobRecord.company_id)
+        .join(Location, Location.id == JobRecord.location_id)
+        .join(Source, Source.id == JobRecord.source_id)
+        .order_by(JobRecord.scraped_at.desc(), JobRecord.id.desc())
+        .limit(limit)
     )
 
+    rows = session.exec(statement).all()
     return [
-        Job(
-            id=row["id"],
-            title=row["title"] or "Untitled job",
-            company=row["company"],
-            location=row["location"],
-            source=row["source"],
-            score=row["score"],
-            url=row["url"],
+        JobListItem(
+            id=job_id,
+            title=title or "Untitled job",
+            company=company,
+            location=location,
+            source=source,
+            score=score,
+            url=url,
         )
-        for row in cursor.fetchall()
+        for job_id, title, company, location, source, score, url in rows
     ]

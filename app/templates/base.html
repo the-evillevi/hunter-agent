@@ -8,16 +8,16 @@
     <!-- HTMX lets server-rendered HTML feel interactive without a frontend build step. -->
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   </head>
-  <body>
-    <header class="site-header">
+  <body class="bg-stone-50 text-slate-800 antialiased">
+    <header class="mx-auto flex w-[min(960px,calc(100%-2rem))] flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p class="eyebrow">Job scraping agent</p>
-        <h1>hunter-agent</h1>
+        <p class="mb-1 text-xs font-semibold uppercase text-slate-500">Job scraping agent</p>
+        <h1 class="text-3xl font-bold tracking-normal text-slate-950">hunter-agent</h1>
       </div>
-      <a class="header-link" href="/health">Health</a>
+      <a class="font-semibold text-teal-700 hover:text-teal-900" href="/health">Health</a>
     </header>
 
-    <main class="page">
+    <main class="mx-auto w-[min(960px,calc(100%-2rem))]">
       {% block content %}{% endblock %}
     </main>
   </body>
