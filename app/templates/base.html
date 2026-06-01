@@ -1,23 +1,31 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>hunter-agent</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}" />
     <!-- HTMX lets server-rendered HTML feel interactive without a frontend build step. -->
     <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   </head>
   <body class="bg-stone-50 text-slate-800 antialiased">
-    <header class="mx-auto flex w-[min(960px,calc(100%-2rem))] flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between">
+    <header
+      class="mx-auto flex w-[min(960px,calc(100%-2rem))] flex-col gap-4 py-8 sm:flex-row sm:items-center sm:justify-between"
+    >
       <div>
-        <p class="mb-1 text-xs font-semibold uppercase text-slate-500">Job scraping agent</p>
-        <h1 class="text-3xl font-bold tracking-normal text-slate-950">hunter-agent</h1>
+        <p class="mb-1 text-xs font-semibold text-slate-500 uppercase">
+          Job scraping agent
+        </p>
+        <h1 class="text-3xl font-bold tracking-normal text-slate-950">
+          hunter-agent
+        </h1>
       </div>
-      <a class="font-semibold text-teal-700 hover:text-teal-900" href="/health">Health</a>
+      <a class="font-semibold text-teal-700 hover:text-teal-900" href="/health"
+        >Health</a
+      >
     </header>
 
-    <main class="container mx-auto px-4 w-[min(960px,calc(100%-2rem))]">
+    <main class="container mx-auto w-[min(960px,calc(100%-2rem))] px-4">
       {% block content %}{% endblock %}
     </main>
   </body>
