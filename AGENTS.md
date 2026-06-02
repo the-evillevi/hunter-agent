@@ -49,10 +49,18 @@ Run tests:
 uv run pytest
 ```
 
-Always run ruff auto-formatter after finishing a change:
+Always run Ruff and Prettier auto-formatters after finishing a change:
 
 ```sh
 uvx ruff format
+pnpm format
+```
+
+Check Ruff and Prettier formatting without changing files:
+
+```sh
+uvx ruff format --check
+pnpm format:check
 ```
 
 ## Coding Style & Naming Conventions
