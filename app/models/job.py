@@ -49,7 +49,7 @@ class Profile(SQLModel, table=True):
     salary_min: int | None = None
     location_type: str | None = None
     match_threshold: int | None = None
-    active: bool | None = None
+    active: bool
 
 
 class JobRecord(SQLModel, table=True):
@@ -62,14 +62,14 @@ class JobRecord(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     profile_id: int = Field(foreign_key="profiles.id")
-    title: str | None = None
+    title: str
     company_id: int = Field(foreign_key="companies.id")
     location_id: int = Field(foreign_key="locations.id")
     url: str | None = Field(default=None, unique=True)
     source_id: int = Field(foreign_key="sources.id")
     description: str | None = None
     hash: str | None = Field(default=None, unique=True)
-    scraped_at: datetime | None = None
+    scraped_at: datetime = Field(default_factory=datetime.now)
     score: int | None = None
     score_reasoning: str | None = None
 

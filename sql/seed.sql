@@ -1,6 +1,10 @@
 -- Sample data for hunter-agent
 -- Generated from config.toml profiles: AI Engineer, Senior Fullstack Engineer
 -- Locations focused on Mexican tech hubs: CDMX, GDL, QRO
+-- Local development seed script. Do not run against data you want to keep.
+PRAGMA foreign_keys = ON;
+
+BEGIN TRANSACTION;
 
 -- Companies
 INSERT INTO companies (name) VALUES ('Palantir Technologies');
@@ -86,3 +90,5 @@ VALUES (
     'Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.',
     datetime('now')
 );
+
+COMMIT;
