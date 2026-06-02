@@ -1,6 +1,5 @@
 # Repository Guidelines
 
-
 ## Project Structure & Module Organization
 
 `app/` contains the FastAPI application. `app/main.py` wires the app together, `app/routes/` owns HTTP endpoints, `app/services/` holds business logic, `app/db/` contains SQLModel session helpers and the local database, and `app/models/` contains SQLModel and Pydantic models. Jinja templates live in `app/templates/`; Tailwind input/output files live in `app/static/`.
@@ -8,7 +7,6 @@
 `sql/` contains database scripts. `sql/hunter-agent.sql` is the schema and `sql/seed.sql` is sample data. `config.toml` is the main configuration file for paths, scheduler settings, job profiles, sources, and application defaults.
 
 Tests live in `tests/` and should mirror the app structure, for example `tests/test_jobs.py`.
-
 
 ## Build, Test, and Development Commands
 
@@ -52,6 +50,7 @@ uv run pytest
 ```
 
 Always run ruff auto-formatter after finishing a change:
+
 ```sh
 uvx ruff format
 ```
@@ -67,7 +66,6 @@ Use `snake_case` for files, functions, variables, and route helpers. Use `Pascal
 Use `pytest`. Name test files `test_*.py` and test functions `test_*`. Focus first on config validation, service/database behavior, and route rendering. FastAPI route tests use `fastapi.testclient.TestClient`.
 
 Good early targets: Pydantic config validation, SQLModel session setup, `list_jobs`, and health route behavior.
-
 
 ## Security & Configuration Tips
 
