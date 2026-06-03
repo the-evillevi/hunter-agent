@@ -12,9 +12,15 @@ Tests live in `tests/` and should mirror the app structure, for example `tests/t
 
 The roadmap is tracked in the Obsidian vault. `vault/HNTR Quests.base` is the canonical quest list, and each quest note lives in `vault/quests/` with an `HNTR-*` ID.
 
+The HNTR Base is an Obsidian Base that reads Markdown frontmatter from quest notes. Agents should treat the Base as a view/index, not as the place where quest data primarily lives. Update quest note properties first; the Base should reflect those notes through its `quests` folder filter.
+
+Each quest note should include `id`, `title`, `status`, `area`, `points`, `order`, and `tags`. Use `status: TODO` for planned work and `status: DONE` only when the quest is actually complete. Keep `order` numeric and continue the existing sequence when adding new quests.
+
 When working on roadmap items, preserve the `HNTR-*` IDs and update the matching quest note properties when status or scope changes. Do not reintroduce task-tracking tables in `README.md`; README is for human orientation and should point to the vault/base instead.
 
 Quest notes use the Proximity Scale in their `points` property: `Cantrip`, `Uncharted Territory`, or `Here Be Dragons`.
+
+Keep README documentation honest about current state versus target vision. `pyproject.toml`, `sql/hunter-agent.sql`, and the existing `app/` structure are the sources of truth for implemented behavior.
 
 ## Build, Test, and Development Commands
 
