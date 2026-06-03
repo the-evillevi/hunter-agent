@@ -13,3 +13,8 @@ wheels/
 # JavaScript dependencies
 node_modules/
 .pnpm-store/
+
+# Obsidian specific overrides
+vault/.obsidian/workspace.json
+vault/.obsidian/workspace-mobile.json
+vault/.obsidian/graph.json

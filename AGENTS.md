@@ -8,6 +8,14 @@
 
 Tests live in `tests/` and should mirror the app structure, for example `tests/test_jobs.py`.
 
+## Quest Tracking
+
+The roadmap is tracked in the Obsidian vault. `vault/HNTR Quests.base` is the canonical quest list, and each quest note lives in `vault/quests/` with an `HNTR-*` ID.
+
+When working on roadmap items, preserve the `HNTR-*` IDs and update the matching quest note properties when status or scope changes. Do not reintroduce task-tracking tables in `README.md`; README is for human orientation and should point to the vault/base instead.
+
+Quest notes use the Proximity Scale in their `points` property: `Cantrip`, `Uncharted Territory`, or `Here Be Dragons`.
+
 ## Build, Test, and Development Commands
 
 Use `uv` for dependency management:
