@@ -32,6 +32,9 @@ views:
         direction: ASC
       - property: status
         direction: ASC
+    columnSize:
+      note.id: 98
+      note.title: 367
   - type: table
     name: By Status
     groupBy:
