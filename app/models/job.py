@@ -9,50 +9,7 @@ from datetime import datetime
 from sqlmodel import Field, SQLModel
 
 
-class Company(SQLModel, table=True):
-    """Company table from sql/hunter-agent.sql."""
-
-    __tablename__ = "companies"
-
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-
-class Location(SQLModel, table=True):
-    """Location table from sql/hunter-agent.sql."""
-
-    __tablename__ = "locations"
-
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-
-class Source(SQLModel, table=True):
-    """Job source table from sql/hunter-agent.sql."""
-
-    __tablename__ = "sources"
-
-    id: int | None = Field(default=None, primary_key=True)
-    name: str = Field(unique=True)
-
-
-class Profile(SQLModel, table=True):
-    """Minimal profile table model needed by JobRecord's foreign key.
-
-    TODO: Expand this when you build profile management screens.
-    """
-
-    __tablename__ = "profiles"
-
-    id: int | None = Field(default=None, primary_key=True)
-    role_name: str | None = None
-    salary_min: int | None = None
-    location_type: str | None = None
-    match_threshold: int | None = None
-    active: bool
-
-
-class JobRecord(SQLModel, table=True):
+class Job(SQLModel, table=True):
     """Jobs table from sql/hunter-agent.sql.
 
     TODO: Add SQLModel relationships after you are comfortable with joins.

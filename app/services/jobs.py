@@ -6,7 +6,10 @@ database access here prevents HTML routes from becoming hard to read.
 
 from sqlmodel import Session, select
 
-from app.models.job import Company, JobListItem, JobRecord, Location, Source
+from app.models.company import Company
+from app.models.job import Job, JobListItem
+from app.models.location import Location
+from app.models.source import Source
 
 
 def list_jobs(session: Session, limit: int = 25) -> list[JobListItem]:
@@ -17,18 +20,18 @@ def list_jobs(session: Session, limit: int = 25) -> list[JobListItem]:
     """
     statement = (
         select(
-            JobRecord.id,
-            JobRecord.title,
+            Job.id,
+            Job.title,
             Company.name,
             Location.name,
             Source.name,
-            JobRecord.score,
-            JobRecord.url,
+            Job.score,
+            Job.url,
         )
-        .join(Company, Company.id == JobRecord.company_id)
-        .join(Location, Location.id == JobRecord.location_id)
-        .join(Source, Source.id == JobRecord.source_id)
-        .order_by(JobRecord.scraped_at.desc(), JobRecord.id.desc())
+        .join(Company, Company.id == Job.company_id)
+        .join(Location, Location.id == Job.location_id)
+        .join(Source, Source.id == Job.source_id)
+        .order_by(Job.scraped_at.desc(), Job.id.desc())
         .limit(limit)
     )
 
