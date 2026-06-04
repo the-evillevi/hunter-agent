@@ -1,7 +1,7 @@
 ---
 id: HNTR-06
 title: Register applications router
-status: TODO
+status: DONE
 area: Application Tracker
 points: Cantrip
 order: 6
