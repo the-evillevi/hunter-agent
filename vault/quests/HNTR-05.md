@@ -1,7 +1,7 @@
 ---
 id: HNTR-05
 title: Add ApplicationListItem and list_applications
-status: TODO
+status: DONE
 area: Application Tracker
 points: Here Be Dragons
 order: 5
