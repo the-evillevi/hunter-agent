@@ -1,43 +1,43 @@
 {% if applications %}
   <div class="grid gap-3">
     {% for application in applications %}
-      <article
-        class="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <h3 class="font-bold text-slate-950">
-            APP-{{ application.id }}: {{ application.job_title }}
-          </h3>
-          <p class="mt-1 text-sm text-slate-500">{{ application.company }}</p>
+      <article class="rounded-box border-base-300 bg-base-100 border p-4">
+        <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+          <div>
+            <h3 class="text-base-content font-semibold">
+              APP-{{ application.id }}: {{ application.job_title }}
+            </h3>
+            <p class="text-base-content/60 mt-1 text-sm">
+              {{ application.company }}
+            </p>
 
-          <span
-            class="inline-flex items-center rounded-md bg-blue-400/10 px-2 py-1 text-xs font-medium text-blue-400 inset-ring inset-ring-blue-400/30"
-          >
-            {{ application.status }}
-          </span>
-        </div>
-
-        <div class="flex flex-col items-center gap-3 whitespace-nowrap">
-          {% if application.cv_path is not none %}
-            <span> {{ application.cv_path }} </span>
-          {% endif %}
-
-          {% if application.applied_at is not none %}
-            <span> Applied at: {{ application.applied_at }} </span>
-          {% endif %}
-          <span> Last updated: {{ application.last_updated }} </span>
-        </div>
-
-        {% if application.notes is not none %}
-          <div class="flex items-center gap-3 whitespace-nowrap">
-            {{ application.notes }}
+            <span class="badge badge-info badge-outline mt-3">
+              {{ application.status }}
+            </span>
           </div>
-        {% endif %}
+
+          <div class="text-base-content/70 text-sm lg:text-right">
+            {% if application.cv_path is not none %}
+              <p>{{ application.cv_path }}</p>
+            {% endif %}
+
+            {% if application.applied_at is not none %}
+              <p>Applied at: {{ application.applied_at }}</p>
+            {% endif %}
+            <p>Last updated: {{ application.last_updated }}</p>
+          </div>
+
+          {% if application.notes is not none %}
+            <p class="text-base-content/70 text-sm lg:col-span-2">
+              {{ application.notes }}
+            </p>
+          {% endif %}
+        </div>
       </article>
     {% endfor %}
   </div>
 {% else %}
-  <p class="text-sm text-slate-500">
+  <p class="text-base-content/60 text-sm">
     No applications found yet. TODO: draft or apply to the first tracked job.
   </p>
 {% endif %}

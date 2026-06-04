@@ -1,39 +1,38 @@
 {% if jobs %}
   <div class="grid gap-3">
     {% for job in jobs %}
-      <article
-        class="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <h3 class="font-bold text-slate-950">{{ job.title }}</h3>
-          <p class="mt-1 text-sm text-slate-500">
-            {{ job.company }} · {{ job.location }} · {{ job.source }}
-          </p>
-        </div>
+      <article class="rounded-box border-base-300 bg-base-100 border p-4">
+        <div
+          class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div>
+            <h3 class="text-base-content font-semibold">{{ job.title }}</h3>
+            <p class="text-base-content/60 mt-1 text-sm">
+              {{ job.company }} · {{ job.location }} · {{ job.source }}
+            </p>
+          </div>
 
-        <div class="flex items-center gap-3 whitespace-nowrap">
-          {% if job.score is not none %}
-            <span
-              class="rounded-full border border-slate-200 px-2 py-1 text-sm text-slate-500"
-              >{{ job.score }}/100</span
-            >
-          {% endif %}
+          <div class="flex items-center gap-2 whitespace-nowrap">
+            {% if job.score is not none %}
+              <span class="badge badge-outline">{{ job.score }}/100</span>
+            {% endif %}
 
-          {% if job.url %}
-            <a
-              class="font-semibold text-teal-700 hover:text-teal-900"
-              href="{{ job.url }}"
-              target="_blank"
-              rel="noreferrer"
-              >Open</a
-            >
-          {% endif %}
+            {% if job.url %}
+              <a
+                class="btn btn-ghost btn-sm"
+                href="{{ job.url }}"
+                target="_blank"
+                rel="noreferrer"
+                >Open</a
+              >
+            {% endif %}
+          </div>
         </div>
       </article>
     {% endfor %}
   </div>
 {% else %}
-  <p class="text-sm text-slate-500">
+  <p class="text-base-content/60 text-sm">
     No jobs found yet. TODO: run seed data or implement the first scraper.
   </p>
 {% endif %}

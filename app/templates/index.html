@@ -1,52 +1,54 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-    <div
-      class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <h2 class="text-xl font-bold text-slate-950">Tracked jobs</h2>
-        <p class="mt-1 text-sm text-slate-500">
-          These rows come from SQLite. The scraper will add more later.
-        </p>
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Tracked jobs</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            These rows come from SQLite. The scraper will add more later.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-get="/jobs"
+          hx-target="#jobs-list"
+          hx-swap="innerHTML"
+        >
+          Refresh
+        </button>
       </div>
 
-      <button
-        type="button"
-        class="rounded-md bg-teal-700 px-4 py-2 font-bold text-white hover:bg-teal-800"
-        hx-get="/jobs"
-        hx-target="#jobs-list"
-        hx-swap="innerHTML"
-      >
-        Refresh
-      </button>
+      <div id="jobs-list">{% include "jobs.html" %}</div>
     </div>
-
-    <div id="jobs-list">{% include "jobs.html" %}</div>
   </section>
 
-  <section
-    class="mt-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
-  >
-    <div
-      class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <h2 class="text-xl font-bold text-slate-950">Tracked applications</h2>
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Tracked applications</h2>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-get="/applications"
+          hx-target="#applications-list"
+          hx-swap="innerHTML"
+        >
+          Refresh
+        </button>
       </div>
 
-      <button
-        type="button"
-        class="rounded-md bg-teal-700 px-4 py-2 font-bold text-white hover:bg-teal-800"
-        hx-get="/applications"
-        hx-target="#applications-list"
-        hx-swap="innerHTML"
-      >
-        Refresh
-      </button>
+      <div id="applications-list">{% include "applications.html" %}</div>
     </div>
-
-    <div id="applications-list">{% include "applications.html" %}</div>
   </section>
 {% endblock %}
