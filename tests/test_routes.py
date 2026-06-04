@@ -21,9 +21,12 @@ def test_home_route_renders_jobs_page() -> None:
 
     assert response.status_code == 200
     assert "Tracked jobs" in response.text
+    assert "Applied" in response.text
+    assert "Avg score" in response.text
+    assert "pending:" in response.text
 
 
-def test_jobs_partial_renders_job_cards() -> None:
+def test_jobs_partial_renders_jobs_table() -> None:
     client = TestClient(app)
 
     response = client.get("/jobs")

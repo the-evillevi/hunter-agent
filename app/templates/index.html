@@ -1,7 +1,46 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="card border-base-300 bg-base-100 border shadow-sm">
+  <section
+    class="stats stats-vertical border-base-300 bg-base-100 lg:stats-horizontal w-full border shadow-sm"
+  >
+    <div class="stat">
+      <div class="stat-title">Tracked jobs</div>
+      <div class="stat-value">{{ dashboard_metrics.tracked_jobs }}</div>
+      <div class="stat-desc">Total saved opportunities</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-title">Applied</div>
+      <div class="stat-value">{{ dashboard_metrics.applied_jobs }}</div>
+      <div class="stat-desc">
+        {{ dashboard_metrics.total_applications }} applications tracked
+      </div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-title">Avg score</div>
+      <div class="stat-value">
+        {% if dashboard_metrics.average_score is not none %}
+          {{ dashboard_metrics.average_score }}
+        {% else %}
+          N/A
+        {% endif %}
+      </div>
+      <div class="stat-desc">Across scored jobs</div>
+    </div>
+
+    <div class="stat">
+      <div class="stat-title">Statuses</div>
+      <div class="mt-2 flex flex-wrap gap-2">
+        {% for status, count in dashboard_metrics.status_counts.items() %}
+          <span class="badge badge-outline">{{ status }}: {{ count }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
     <div class="card-body">
       <div
         class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
