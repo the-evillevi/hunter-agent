@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "daisyui";
 
 /*
   Tailwind scans these files to find class names used by Jinja templates.
