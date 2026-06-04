@@ -40,6 +40,7 @@ class ApplicationListItem(SQLModel):
 
     id: int
     job_title: str
+    company: str
     cv_path: str | None
     status: ApplicationStatus
     applied_at: datetime | None

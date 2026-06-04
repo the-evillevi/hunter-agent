@@ -9,15 +9,14 @@ from pathlib import Path
 import sqlite3
 
 from fastapi.testclient import TestClient
-import pytest
 from sqlmodel import Session
 
 from app.db.database import engine
 from app.main import app
+from app.routes import applications as applications_route
 from app.services.applications import list_applications
 
 
-@pytest.mark.skip(reason="APP-05: implement the SQLModel applications list query")
 def test_list_applications_returns_seeded_application() -> None:
     """Join applications to jobs and companies for a useful display shape."""
     with Session(engine) as session:
@@ -26,13 +25,12 @@ def test_list_applications_returns_seeded_application() -> None:
     assert len(applications) >= 1
 
     application = applications[0]
-    assert application.title == "AI/ML Engineer"
+    assert application.job_title == "AI/ML Engineer"
     assert application.company == "Kavak"
     assert application.status == "pending"
     assert application.applied_at is None
 
 
-@pytest.mark.skip(reason="APP-06 and APP-07: register and render applications")
 def test_applications_partial_renders_application_card() -> None:
     """Expose the partial route and render values instead of an empty card."""
     client = TestClient(app)
@@ -45,7 +43,25 @@ def test_applications_partial_renders_application_card() -> None:
     assert "pending" in response.text
 
 
-@pytest.mark.skip(reason="APP-01, APP-02, and APP-10: make schema replay reliable")
+def test_applications_partial_renders_empty_state(monkeypatch) -> None:
+    """Render a useful message when there are no tracked applications."""
+
+    def empty_applications(session: Session):
+        return []
+
+    monkeypatch.setattr(
+        applications_route,
+        "list_applications",
+        empty_applications,
+    )
+    client = TestClient(app)
+
+    response = client.get("/applications")
+
+    assert response.status_code == 200
+    assert "No applications found yet" in response.text
+
+
 def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
     """A clean SQLite database should be reproducible from committed SQL."""
     schema_path = Path("sql/hunter-agent.sql")

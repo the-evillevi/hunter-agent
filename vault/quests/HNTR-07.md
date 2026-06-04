@@ -1,7 +1,7 @@
 ---
 id: HNTR-07
 title: Render applications partial
-status: TODO
+status: DONE
 area: Application Tracker
 points: Uncharted Territory
 order: 7
