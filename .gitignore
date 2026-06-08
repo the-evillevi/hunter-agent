@@ -15,6 +15,7 @@ node_modules/
 .pnpm-store/
 
 # Obsidian specific overrides
-vault/.obsidian/workspace.json
-vault/.obsidian/workspace-mobile.json
-vault/.obsidian/graph.json
+hntr-vault/.obsidian/workspace.json
+hntr-vault/.obsidian/workspace-mobile.json
+hntr-vault/.obsidian/graph.json
+hntr-vault/.obsidian/
