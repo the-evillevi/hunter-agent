@@ -8,21 +8,22 @@ decorator at a time and use the failing assertion as your next clue.
 from pathlib import Path
 import sqlite3
 
-from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from app.db.database import engine
-from app.main import app
 from app.routes import applications as applications_route
 from app.services.applications import list_applications
 
 
-def test_list_applications_returns_seeded_application() -> None:
+def test_list_applications_returns_fixture_application(
+    session: Session,
+    create_application,
+) -> None:
     """Join applications to jobs and companies for a useful display shape."""
-    with Session(engine) as session:
-        applications = list_applications(session)
+    create_application()
 
-    assert len(applications) >= 1
+    applications = list_applications(session)
+
+    assert len(applications) == 1
 
     application = applications[0]
     assert application.job_title == "AI/ML Engineer"
@@ -31,9 +32,9 @@ def test_list_applications_returns_seeded_application() -> None:
     assert application.applied_at is None
 
 
-def test_applications_partial_renders_application_card() -> None:
+def test_applications_partial_renders_application_card(client, create_application) -> None:
     """Expose the partial route and render values instead of an empty card."""
-    client = TestClient(app)
+    create_application()
 
     response = client.get("/applications")
 
@@ -43,7 +44,7 @@ def test_applications_partial_renders_application_card() -> None:
     assert "pending" in response.text
 
 
-def test_applications_partial_renders_empty_state(monkeypatch) -> None:
+def test_applications_partial_renders_empty_state(monkeypatch, client) -> None:
     """Render a useful message when there are no tracked applications."""
 
     def empty_applications(session: Session):
@@ -54,8 +55,6 @@ def test_applications_partial_renders_empty_state(monkeypatch) -> None:
         "list_applications",
         empty_applications,
     )
-    client = TestClient(app)
-
     response = client.get("/applications")
 
     assert response.status_code == 200
