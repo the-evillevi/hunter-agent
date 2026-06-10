@@ -93,7 +93,7 @@ exclude_keywords = ["gaming", "blockchain", "web3"]
 [sources]
 
 [sources.adzuna]
-enabled = true
+enabled = false
 app_id = "YOUR_ADZUNA_APP_ID"   # free at developer.adzuna.com
 app_key = "YOUR_ADZUNA_APP_KEY"
 country = "gb"                  # gb | us | ca | au | de | fr
