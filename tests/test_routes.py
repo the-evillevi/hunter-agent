@@ -21,6 +21,8 @@ def test_home_route_renders_jobs_page() -> None:
 
     assert response.status_code == 200
     assert "Tracked jobs" in response.text
+    assert "Job sources" in response.text
+    assert "Adzuna" in response.text
     assert "Applied" in response.text
     assert "Avg score" in response.text
     assert "pending:" in response.text
