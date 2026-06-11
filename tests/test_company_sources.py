@@ -141,9 +141,7 @@ def test_company_source_orchestration_fetches_and_normalizes_with_app_config() -
     assert [
         (company.symbol, company.name, company.weight, company.order)
         for company in companies
-    ] == [
-        ("NVDA", "NVIDIA CORP", 7.972064, 1)
-    ]
+    ] == [("NVDA", "NVIDIA CORP", 7.972064, 1)]
     assert companies[0].raw_metadata["agent"] == "hunter-agent"
 
 

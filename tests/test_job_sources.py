@@ -25,7 +25,9 @@ class FakeAdapter:
         self.raw_jobs = list(raw_jobs)
         self.seen_contexts: list[JobSourceRunContext] = []
 
-    async def fetch(self, context: JobSourceRunContext) -> Sequence[Mapping[str, object]]:
+    async def fetch(
+        self, context: JobSourceRunContext
+    ) -> Sequence[Mapping[str, object]]:
         self.seen_contexts.append(context)
         return self.raw_jobs
 

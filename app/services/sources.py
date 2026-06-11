@@ -185,9 +185,7 @@ class JobSourceRegistry:
         """
         enabled_names = set(session.exec(select(Source.name)).all())
         return [
-            adapter
-            for name, adapter in self._adapters.items()
-            if name in enabled_names
+            adapter for name, adapter in self._adapters.items() if name in enabled_names
         ]
 
 
