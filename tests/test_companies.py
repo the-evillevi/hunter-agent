@@ -30,6 +30,8 @@ def test_company_model_stores_sp500_metadata(session: Session) -> None:
         is_sp500=True,
         sp500_weight_rank=1,
         sp500_tier="mag7",
+        sp500_rank_source="ssga_spy_holdings:weight",
+        sp500_rank_status="weight_derived",
         sp500_provider="SSGA",
         sp500_identifier="037833100",
         sp500_sedol="2046251",
@@ -49,6 +51,8 @@ def test_company_model_stores_sp500_metadata(session: Session) -> None:
     assert company.ticker == "AAPL"
     assert company.cik == "0000320193"
     assert company.sp500_tier == "mag7"
+    assert company.sp500_rank_source == "ssga_spy_holdings:weight"
+    assert company.sp500_rank_status == "weight_derived"
     assert company.sp500_identifier == "037833100"
     assert company.sp500_holdings_as_of == date(2026, 6, 9)
 

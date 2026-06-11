@@ -145,6 +145,15 @@ CREATE TABLE companies (
       'top500'
     )
   ),
+  sp500_rank_source TEXT,
+  sp500_rank_status TEXT CHECK (
+    sp500_rank_status IS NULL
+    OR sp500_rank_status IN (
+      'weight_derived',
+      'fallback_source_order',
+      'unavailable'
+    )
+  ),
   sp500_provider TEXT,
   sp500_identifier TEXT,
   sp500_sedol TEXT,
@@ -261,6 +270,8 @@ then likely Slickcharts. The `sp500_tier` values are constrained to `mag7`,
 `top100`, `top200`, `top300`, `top400`, and `top500`; `mag7` means Apple,
 Microsoft, Nvidia, Amazon, Alphabet, Meta, and Tesla, while `top100` excludes
 those Magnificent 7 companies and the remaining buckets follow rank ranges.
+`sp500_rank_source` and `sp500_rank_status` distinguish true SSGA/SPY
+weight-derived rank from explicitly marked fallback/source-order enrichment.
 Companies removed from the index are represented in `removed_sp500_companies`
 with a removal date instead of being folded into the active company row.
 

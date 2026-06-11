@@ -53,6 +53,15 @@ CREATE TABLE companies (
       'top500'
     )
   ),
+  sp500_rank_source TEXT,
+  sp500_rank_status TEXT CHECK (
+    sp500_rank_status IS NULL
+    OR sp500_rank_status IN (
+      'weight_derived',
+      'fallback_source_order',
+      'unavailable'
+    )
+  ),
   sp500_provider TEXT,
   sp500_identifier TEXT,
   sp500_sedol TEXT,

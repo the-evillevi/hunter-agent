@@ -91,7 +91,6 @@ def test_normalized_company_payload_uses_hntr_33_compatible_names() -> None:
         "sp500_identifier": "037833100",
         "sp500_sedol": "2046251",
         "sp500_weight": 6.721774,
-        "sp500_weight_rank": 2,
         "sp500_shares_held": 179_731_797.0,
         "sp500_local_currency": "USD",
         "is_sp500": True,

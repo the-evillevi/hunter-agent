@@ -20,6 +20,11 @@ class Company(SQLModel, table=True):
             "sp500_weight_rank IS NULL OR sp500_weight_rank BETWEEN 1 AND 500",
             name="ck_companies_sp500_weight_rank",
         ),
+        CheckConstraint(
+            "sp500_rank_status IS NULL OR sp500_rank_status IN "
+            "('weight_derived', 'fallback_source_order', 'unavailable')",
+            name="ck_companies_sp500_rank_status",
+        ),
     )
 
     id: int | None = Field(default=None, primary_key=True)
@@ -37,6 +42,8 @@ class Company(SQLModel, table=True):
     is_sp500: bool = False
     sp500_weight_rank: int | None = None
     sp500_tier: str | None = None
+    sp500_rank_source: str | None = None
+    sp500_rank_status: str | None = None
     sp500_provider: str | None = None
     sp500_identifier: str | None = None
     sp500_sedol: str | None = None
