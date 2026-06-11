@@ -10,8 +10,9 @@ import sqlite3
 
 from sqlmodel import Session
 
+from app.models.application import ApplicationStatus
 from app.routes import applications as applications_route
-from app.services.applications import list_applications
+from app.services.applications import list_applications, update_application_status
 
 
 def test_list_applications_returns_fixture_application(
@@ -32,7 +33,75 @@ def test_list_applications_returns_fixture_application(
     assert application.applied_at is None
 
 
-def test_applications_partial_renders_application_card(client, create_application) -> None:
+def test_update_application_status_moves_across_statuses(
+    session: Session,
+    create_application,
+) -> None:
+    """Status edits are flexible and refresh the display row."""
+    application = create_application(status=ApplicationStatus.rejected)
+    previous_last_updated = application.last_updated
+
+    updated = update_application_status(
+        session,
+        application_id=application.id,
+        status=ApplicationStatus.draft,
+    )
+
+    assert updated.status == ApplicationStatus.draft
+    assert updated.applied_at is None
+    assert updated.last_updated > previous_last_updated
+
+
+def test_update_application_status_sets_applied_at_only_when_missing(
+    session: Session,
+    create_application,
+) -> None:
+    """Moving into applied records first application time without losing history."""
+    application = create_application(status=ApplicationStatus.pending)
+
+    applied = update_application_status(
+        session,
+        application_id=application.id,
+        status=ApplicationStatus.applied,
+    )
+    applied_at = applied.applied_at
+
+    assert applied_at is not None
+
+    rejected = update_application_status(
+        session,
+        application_id=application.id,
+        status=ApplicationStatus.rejected,
+    )
+    assert rejected.applied_at == applied_at
+
+    reapplied = update_application_status(
+        session,
+        application_id=application.id,
+        status=ApplicationStatus.applied,
+    )
+    assert reapplied.applied_at == applied_at
+
+
+def test_update_application_status_missing_application_raises(
+    session: Session,
+) -> None:
+    """A missing application ID is reported distinctly from bad status input."""
+    try:
+        update_application_status(
+            session,
+            application_id=999,
+            status=ApplicationStatus.applied,
+        )
+    except LookupError as error:
+        assert "Application 999" in str(error)
+    else:
+        raise AssertionError("Expected missing application to raise LookupError")
+
+
+def test_applications_partial_renders_application_card(
+    client, create_application
+) -> None:
     """Expose the partial route and render values instead of an empty card."""
     create_application()
 
@@ -42,6 +111,86 @@ def test_applications_partial_renders_application_card(client, create_applicatio
     assert "AI/ML Engineer" in response.text
     assert "Kavak" in response.text
     assert "pending" in response.text
+
+
+def test_application_status_patch_renders_only_updated_card(
+    client,
+    create_application,
+    create_job,
+) -> None:
+    """HTMX receives one fresh card for the edited application."""
+    first_application = create_application()
+    create_application(
+        job=create_job(
+            title="Backend Engineer",
+            company_name="Globant",
+            location_name="Guadalajara",
+            source_name="Remotive",
+        ),
+        status=ApplicationStatus.pending,
+        notes="A second card that should not be returned.",
+    )
+
+    response = client.patch(
+        f"/applications/{first_application.id}",
+        data={"status": "applied"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.text.count("<article") == 1
+    assert f"APP-{first_application.id}: AI/ML Engineer" in response.text
+    assert "applied" in response.text
+    assert "A second card that should not be returned." not in response.text
+
+
+def test_application_status_patch_rejects_invalid_status(
+    client,
+    create_application,
+) -> None:
+    """Unknown target statuses are client errors."""
+    application = create_application()
+
+    response = client.patch(
+        f"/applications/{application.id}",
+        data={"status": "sent-to-space"},
+    )
+
+    assert response.status_code == 400
+
+
+def test_application_status_patch_returns_404_for_missing_application(client) -> None:
+    """Missing application IDs return a proper not found response."""
+    response = client.patch("/applications/999", data={"status": "applied"})
+
+    assert response.status_code == 404
+
+
+def test_applications_partial_exposes_all_status_controls(
+    client,
+    create_application,
+) -> None:
+    """Status controls are available immediately in the requested order."""
+    create_application(status=ApplicationStatus.pending)
+
+    response = client.get("/applications")
+
+    assert response.status_code == 200
+    positions = [
+        response.text.index(f'value="{status.value}"')
+        for status in (
+            ApplicationStatus.pending,
+            ApplicationStatus.draft,
+            ApplicationStatus.applied,
+            ApplicationStatus.rejected,
+            ApplicationStatus.acknowledged,
+            ApplicationStatus.interviews,
+            ApplicationStatus.offer,
+            ApplicationStatus.accepted,
+            ApplicationStatus.ghosted,
+        )
+    ]
+    assert positions == sorted(positions)
 
 
 def test_applications_partial_renders_empty_state(monkeypatch, client) -> None:
