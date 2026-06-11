@@ -32,7 +32,9 @@ def test_list_applications_returns_fixture_application(
     assert application.applied_at is None
 
 
-def test_applications_partial_renders_application_card(client, create_application) -> None:
+def test_applications_partial_renders_application_card(
+    client, create_application
+) -> None:
     """Expose the partial route and render values instead of an empty card."""
     create_application()
 
@@ -81,5 +83,58 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
             JOIN companies ON companies.id = jobs.company_id
             """
         ).fetchone()
+        blacklist = connection.execute(
+            """
+            SELECT blacklist.reason, companies.name
+            FROM blacklist
+            JOIN companies ON companies.id = blacklist.company_id
+            """
+        ).fetchone()
+        columns = {
+            row[1]
+            for row in connection.execute("PRAGMA table_info(companies)").fetchall()
+        }
+        history_columns = {
+            row[1]
+            for row in connection.execute(
+                "PRAGMA table_info(removed_sp500_companies)"
+            ).fetchall()
+        }
 
     assert application == ("AI/ML Engineer", "Kavak", "pending", None)
+    assert blacklist == (
+        "Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.",
+        "Palantir Technologies",
+    )
+    assert {
+        "ticker",
+        "cik",
+        "sector",
+        "sub_industry",
+        "headquarters",
+        "date_added",
+        "founded",
+        "sp500_source",
+        "sp500_source_url",
+        "is_sp500",
+        "sp500_weight_rank",
+        "sp500_tier",
+        "sp500_provider",
+        "sp500_identifier",
+        "sp500_sedol",
+        "sp500_weight",
+        "sp500_shares_held",
+        "sp500_local_currency",
+        "sp500_holdings_as_of",
+        "sp500_last_seen_at",
+        "sp500_last_updated_at",
+    }.issubset(columns)
+    assert {
+        "company_id",
+        "ticker",
+        "name",
+        "removal_date",
+        "removal_reason",
+        "source",
+        "source_url",
+    }.issubset(history_columns)
