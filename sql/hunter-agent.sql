@@ -20,11 +20,60 @@ DROP TABLE IF EXISTS sources;
 
 DROP TABLE IF EXISTS locations;
 
+DROP TABLE IF EXISTS removed_sp500_companies;
+
 DROP TABLE IF EXISTS companies;
 
 CREATE TABLE companies (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL UNIQUE,
+  ticker TEXT UNIQUE,
+  exchange TEXT,
+  cik TEXT,
+  sector TEXT,
+  sub_industry TEXT,
+  headquarters TEXT,
+  date_added DATE,
+  founded TEXT,
+  sp500_source TEXT,
+  sp500_source_url TEXT,
+  is_sp500 BOOLEAN NOT NULL DEFAULT 0 CHECK (is_sp500 IN (0, 1)),
+  sp500_weight_rank INTEGER CHECK (
+    sp500_weight_rank IS NULL
+    OR sp500_weight_rank BETWEEN 1 AND 500
+  ),
+  sp500_tier TEXT CHECK (
+    sp500_tier IS NULL
+    OR sp500_tier IN (
+      'mag7',
+      'top100',
+      'top200',
+      'top300',
+      'top400',
+      'top500'
+    )
+  ),
+  sp500_provider TEXT,
+  sp500_identifier TEXT,
+  sp500_sedol TEXT,
+  sp500_weight REAL,
+  sp500_shares_held REAL,
+  sp500_local_currency TEXT,
+  sp500_holdings_as_of DATE,
+  sp500_last_seen_at DATETIME,
+  sp500_last_updated_at DATETIME
+);
+
+CREATE TABLE removed_sp500_companies (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company_id INTEGER REFERENCES companies (id),
+  ticker TEXT,
+  name TEXT NOT NULL,
+  removal_date DATE NOT NULL,
+  removal_reason TEXT,
+  source TEXT,
+  source_url TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE locations (
