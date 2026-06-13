@@ -7,9 +7,70 @@ PRAGMA foreign_keys = ON;
 BEGIN TRANSACTION;
 
 -- Companies
-INSERT INTO companies (name) VALUES ('Palantir Technologies');
+INSERT INTO companies (
+    name,
+    ticker,
+    exchange,
+    cik,
+    sector,
+    sub_industry,
+    headquarters,
+    date_added,
+    founded,
+    sp500_source,
+    sp500_source_url,
+    is_sp500,
+    sp500_weight_rank,
+    sp500_tier,
+    sp500_rank_source,
+    sp500_rank_status,
+    sp500_provider,
+    sp500_identifier,
+    sp500_sedol,
+    sp500_weight,
+    sp500_shares_held,
+    sp500_local_currency,
+    sp500_holdings_as_of,
+    sp500_last_seen_at,
+    sp500_last_updated_at
+) VALUES (
+    'Palantir Technologies',
+    'PLTR',
+    'NASDAQ',
+    '0001321655',
+    'Information Technology',
+    'Application Software',
+    'Denver, Colorado',
+    '2024-09-23',
+    '2003',
+    'ssga_spy_holdings',
+    'https://www.ssga.com/us/en/individual/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx',
+    1,
+    100,
+    'top100',
+    'ssga_spy_holdings:weight',
+    'weight_derived',
+    'SSGA',
+    '69608A108',
+    'B01NPJ1',
+    0.45,
+    12000000,
+    'USD',
+    date('now'),
+    datetime('now'),
+    datetime('now')
+);
 INSERT INTO companies (name) VALUES ('Kavak');
-INSERT INTO companies (name) VALUES ('Globant');
+INSERT INTO companies (name, ticker, exchange, cik, sector, headquarters, founded)
+VALUES (
+    'Globant',
+    'GLOB',
+    'NYSE',
+    '0001557860',
+    'Information Technology',
+    'Luxembourg City, Luxembourg',
+    '2003'
+);
 
 -- Locations
 INSERT INTO locations (name) VALUES ('CDMX');
