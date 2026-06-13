@@ -10,6 +10,8 @@
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
     "@tailwindcss/cli": "^4.1.17",
     "daisyui": "^5.5.20",
     "prettier": "^3.8.3",
