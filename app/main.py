@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import applications, health, jobs
+from app.routes import applications, health, jobs, sources
 
 app = FastAPI(title="hunter-agent")
 
@@ -12,3 +12,4 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(health.router)
 app.include_router(applications.router)
 app.include_router(jobs.router)
+app.include_router(sources.router)

@@ -1,4 +1,8 @@
-"""Job source adapter protocol and registry.
+"""Job source lookup, enablement, adapter protocol, and registry.
+
+The database is the runtime source of truth for whether a job source is enabled.
+Config can still provide credentials, but the app should not require a config
+edit just to toggle a source during normal use.
 
 Adapters receive a small explicit ``JobSourceRunContext`` instead of the full
 application config. That keeps source implementations decoupled from unrelated
@@ -17,6 +21,33 @@ from typing import Any, Protocol
 from sqlmodel import Session, select
 
 from app.models.source import Source
+
+
+class SourceNotFoundError(ValueError):
+    """Raised when a source toggle targets an unknown source."""
+
+
+def list_sources(session: Session) -> list[Source]:
+    """Return persisted job sources in a stable display order."""
+    return list(session.exec(select(Source).order_by(Source.name)))
+
+
+def get_source(session: Session, source_id: int) -> Source:
+    """Return one source or raise a small domain error."""
+    source = session.get(Source, source_id)
+    if source is None:
+        raise SourceNotFoundError(f"source {source_id} was not found")
+    return source
+
+
+def set_source_enabled(session: Session, source_id: int, enabled: bool) -> Source:
+    """Persist the enabled flag for a source and return the updated row."""
+    source = get_source(session, source_id)
+    source.enabled = enabled
+    session.add(source)
+    session.commit()
+    session.refresh(source)
+    return source
 
 
 @dataclass(frozen=True)
@@ -198,19 +229,23 @@ class JobSourceRegistry:
         ]
 
     def resolve_enabled(self, session: Session) -> list[ResolvedJobSource]:
-        """Resolve adapters enabled by the database.
-
-        Until HNTR-22 adds explicit enablement fields, a row in ``sources`` is
-        the minimum viable signal that the source participates in a run.
-        """
+        """Resolve adapters enabled by the database."""
         db_sources = {
-            source.name: source for source in session.exec(select(Source)).all()
+            normalize_source_name(source.name): source
+            for source in session.exec(
+                select(Source).where(Source.enabled).order_by(Source.name)
+            ).all()
         }
         return [
-            ResolvedJobSource(adapter=adapter, db_source=db_sources[name])
+            ResolvedJobSource(adapter=adapter, db_source=db_sources[normalized_name])
             for name, adapter in self._adapters.items()
-            if name in db_sources
+            if (normalized_name := normalize_source_name(name)) in db_sources
         ]
+
+
+def normalize_source_name(source_name: str) -> str:
+    """Normalize source names for DB display names and adapter identities."""
+    return source_name.strip().casefold()
 
 
 def make_job_identity_hash(
@@ -223,7 +258,7 @@ def make_job_identity_hash(
     location: str | None = None,
 ) -> str:
     """Build a stable minimum identity hash for future dedupe."""
-    normalized_source_name = source_name.strip().casefold()
+    normalized_source_name = normalize_source_name(source_name)
     if external_id:
         identity_parts = [normalized_source_name, external_id.strip().casefold()]
     elif url:

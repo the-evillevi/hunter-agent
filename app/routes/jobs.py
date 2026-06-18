@@ -12,6 +12,7 @@ from sqlmodel import Session
 from app.db.database import get_session
 from app.services.dashboard import get_dashboard_metrics
 from app.services.jobs import list_jobs
+from app.services.sources import list_sources
 
 
 router = APIRouter()
@@ -26,11 +27,12 @@ def home(request: Request, session: Session = Depends(get_session)) -> HTMLRespo
     after a scrape without reloading the whole browser page.
     """
     jobs = list_jobs(session)
+    sources = list_sources(session)
     dashboard_metrics = get_dashboard_metrics(session)
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"dashboard_metrics": dashboard_metrics, "jobs": jobs},
+        {"dashboard_metrics": dashboard_metrics, "jobs": jobs, "sources": sources},
     )
 
 

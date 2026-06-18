@@ -145,7 +145,7 @@ def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
     registry.register(adzuna)
 
     with make_session() as session:
-        session.add(Source(name="remotive"))
+        session.add(Source(name="Remotive"))
         session.commit()
 
         resolved_sources = registry.resolve_enabled(session)
@@ -153,7 +153,28 @@ def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
     assert len(resolved_sources) == 1
     assert resolved_sources[0].adapter == remotive
     assert resolved_sources[0].db_source is not None
-    assert resolved_sources[0].db_source.name == "remotive"
+    assert resolved_sources[0].db_source.name == "Remotive"
+
+
+def test_registry_excludes_disabled_database_sources() -> None:
+    registry = JobSourceRegistry()
+    remotive = FakeAdapter("remotive", [])
+    adzuna = FakeAdapter("adzuna", [])
+    registry.register(remotive)
+    registry.register(adzuna)
+
+    with make_session() as session:
+        session.add(Source(name="Adzuna", enabled=False))
+        session.add(Source(name="Remotive", enabled=True))
+        session.commit()
+
+        resolved_sources = registry.resolve_enabled(session)
+
+    assert [resolved_source.adapter for resolved_source in resolved_sources] == [
+        remotive
+    ]
+    assert resolved_sources[0].db_source is not None
+    assert resolved_sources[0].db_source.name == "Remotive"
 
 
 def test_registry_can_resolve_explicit_source_selection_without_database() -> None:
