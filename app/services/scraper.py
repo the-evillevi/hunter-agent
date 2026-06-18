@@ -41,7 +41,8 @@ async def scrape_jobs_async(
             adapters = source_registry.resolve_enabled(db_session)
 
     normalized_jobs: list[NormalizedJob] = []
-    for adapter in adapters:
+    for resolved_source in adapters:
+        adapter = resolved_source.adapter
         raw_jobs = await adapter.fetch(run_context)
         normalized_jobs.extend(
             adapter.normalize(raw_job, run_context) for raw_job in raw_jobs
