@@ -1,15 +1,13 @@
 # hunter-agent
 
-A small FastAPI, SQLite, SQLModel, and HTMX project for learning by building a
+A FastAPI, SQLite, SQLModel, and HTMX project for learning by building a
 job tracker.
 
 The long-term vision is a local-first job application assistant that will crawl
 job sources, score listings against target profiles, prepare application
-materials, and track outcomes in SQLite. The current repo is intentionally
-smaller: it is growing from a tested FastAPI/SQLModel foundation toward that
-vision one quest at a time.
+materials, and track outcomes in SQLite.
 
-> Automated job application assistant · MacBook Pro M5 16GB · Ollama · Python · SQLite
+> Automated job application assistant · MacBook Pro M5 16GB · Codex/Ollama · Python · SQLite
 
 ## Current State
 
@@ -21,7 +19,7 @@ The application currently uses:
 | Package manager | uv                                                        |
 | Web app         | FastAPI                                                   |
 | Templates       | Jinja                                                     |
-| Styling         | TailwindCSS via pnpm                                      |
+| Styling         | TailwindCSS and Daisy UI via pnpm                         |
 | Database        | SQLite + SQLModel                                         |
 | Config          | TOML + Pydantic validation                                |
 | Tests           | pytest + FastAPI TestClient                               |
@@ -58,15 +56,12 @@ Run the local app:
 uv run uvicorn app.main:app --reload
 ```
 
-## Quest Roadmap
+## Issue Tracking
 
-The project roadmap lives in the Obsidian vault at `vault/`. Open
-`vault/HNTR Quests.base` to see the canonical quest list.
+The project roadmap and issue tracking lives in Linear
 
-Work through quests in `order` sequence. The application exercises in
-`tests/test_applications.py` are skipped initially so the existing test suite
-stays green. Remove a test's `@pytest.mark.skip` decorator when you start its
-related quest.
+- Team: Hunter
+- Project: Hunter Agent
 
 ## Test Practice
 
@@ -115,96 +110,6 @@ hunter-agent/
 It drops and recreates all tables, so do not run it against data you want to
 keep.
 
-```sql
-CREATE TABLE companies (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE locations (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE sources (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE keywords (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
-);
-
-CREATE TABLE profiles (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  role_name TEXT,
-  salary_min INT,
-  location_type TEXT CHECK (location_type IN ('remote', 'hybrid', 'onsite')),
-  match_threshold INT CHECK (match_threshold BETWEEN 1 AND 100),
-  active BOOLEAN NOT NULL CHECK (active IN (0, 1))
-);
-
-CREATE TABLE profile_keywords (
-  profile_id INTEGER NOT NULL REFERENCES profiles (id),
-  keyword_id INTEGER NOT NULL REFERENCES keywords (id),
-  PRIMARY KEY (profile_id, keyword_id)
-);
-
-CREATE TABLE jobs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  profile_id INTEGER NOT NULL REFERENCES profiles (id),
-  title TEXT NOT NULL,
-  company_id INTEGER NOT NULL REFERENCES companies (id),
-  location_id INTEGER NOT NULL REFERENCES locations (id),
-  url TEXT UNIQUE,
-  source_id INTEGER NOT NULL REFERENCES sources (id),
-  description TEXT,
-  hash TEXT UNIQUE,
-  scraped_at DATETIME NOT NULL,
-  score INT CHECK (score BETWEEN 1 AND 100),
-  score_reasoning TEXT
-);
-
-CREATE TABLE applications (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  job_id INTEGER NOT NULL UNIQUE REFERENCES jobs (id),
-  cv_path TEXT,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (
-    status IN (
-      'pending',
-      'draft',
-      'applied',
-      'acknowledged',
-      'interviews',
-      'rejected',
-      'ghosted',
-      'offer',
-      'accepted'
-    )
-  ),
-  applied_at DATETIME,
-  last_updated DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  notes TEXT
-);
-
-CREATE INDEX idx_applications_last_updated ON applications (last_updated);
-CREATE INDEX idx_applications_status ON applications (status);
-
-CREATE TABLE blacklist (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  company_id INTEGER REFERENCES companies (id),
-  job_id INTEGER REFERENCES jobs (id),
-  reason TEXT,
-  added_at DATETIME NOT NULL,
-  CHECK (
-    (company_id IS NOT NULL AND job_id IS NULL)
-    OR
-    (company_id IS NULL AND job_id IS NOT NULL)
-  )
-);
-```
-
 ## Configuration
 
 `config.toml` currently contains:
@@ -252,6 +157,7 @@ when their implementation work begins:
 | Scheduling         | APScheduler                   | Runs inside the app, no cron needed           |
 | Browser automation | Playwright                    | Handles JS-heavy application forms            |
 | Local AI           | Ollama + Ollama Python client | Private local inference on Apple Silicon      |
+| AI Provider        | Codex                         | GPT5.5 for heavy lifting.                     |
 | CV generation      | python-docx + PDF export path | Edit Word master and export application files |
 | Semantic scoring   | sentence-transformers         | Local embedding-based similarity              |
 | Keyword scoring    | rank-bm25                     | Deterministic keyword overlap                 |
@@ -263,8 +169,8 @@ the same time.
 
 | Task         | Candidate model | Notes                                      |
 | ------------ | --------------- | ------------------------------------------ |
-| Scoring      | qwen2.5:7b      | Fast enough for larger batches of listings |
-| CV tailoring | qwen2.5:14b     | Better writing for jobs above threshold    |
+| Scoring      | qwen2.5:14b     | Fast enough for larger batches of listings |
+| CV tailoring | GPT5.5          | Better writing for jobs above threshold    |
 
 ## Future Architecture Notes
 
@@ -306,8 +212,6 @@ This project should create practice with:
 - model benchmarking across keyword, semantic, and LLM scores
 - observability for score drift and source health
 
-_Last updated: README aligned with the current repo structure and target quest roadmap._
-
 ## License
 
 This project is source-available under the Hippocratic License 3.0 with the Copyleft, Workers on Board of Directors, Military Activities, and Mass Surveillance modules enabled.
@@ -324,6 +228,3 @@ This project was developed with substantial assistance from AI coding tools, inc
 The maintainer is responsible for the project’s architecture, prompts, review,
 testing, integration, documentation, and published form. AI-generated code has
 been reviewed and modified as needed before inclusion.
-
-Use of AI assistance does not grant any additional permissions beyond this
-repository’s license.
