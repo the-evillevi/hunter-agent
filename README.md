@@ -110,6 +110,18 @@ hunter-agent/
 It drops and recreates all tables, so do not run it against data you want to
 keep.
 
+S&P 500 metadata is stored directly on `companies` for this iteration. `ticker`
+is globally unique and acts as the single symbol identity across providers;
+`cik` stays nullable because the SSGA holdings workbook `Identifier` value is
+not guaranteed to be a CIK. The first source of truth is the SSGA State Street
+SPDR S&P 500 ETF Trust holdings workbook, followed by Wikipedia enrichment and
+then likely Slickcharts. The `sp500_tier` values are constrained to `mag7`,
+`top100`, `top200`, `top300`, `top400`, and `top500`; `mag7` means Apple,
+Microsoft, Nvidia, Amazon, Alphabet, Meta, and Tesla, while `top100` excludes
+those Magnificent 7 companies and the remaining buckets follow rank ranges.
+Companies removed from the index are represented in `removed_sp500_companies`
+with a removal date instead of being folded into the active company row.
+
 ## Configuration
 
 `config.toml` currently contains:
