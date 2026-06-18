@@ -13,7 +13,7 @@ from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
-from sqlmodel import SQLModel, Session, create_engine
+from sqlmodel import SQLModel, Session, create_engine, select
 
 from app.db.database import get_session
 from app.main import app
@@ -70,6 +70,17 @@ def client(engine: Engine) -> Iterator[TestClient]:
 def create_job(session: Session) -> Callable[..., Job]:
     """Insert only the rows a test needs for a joinable job."""
 
+    def get_or_create_named(model, name: str):
+        existing_row = session.exec(select(model).where(model.name == name)).first()
+        if existing_row is not None:
+            return existing_row
+
+        row = model(name=name)
+        session.add(row)
+        session.commit()
+        session.refresh(row)
+        return row
+
     def _create_job(
         *,
         title: str = "AI/ML Engineer",
@@ -86,10 +97,10 @@ def create_job(session: Session) -> Callable[..., Job]:
             match_threshold=80,
             active=True,
         )
-        company = Company(name=company_name)
-        location = Location(name=location_name)
-        source = Source(name=source_name)
-        session.add_all([profile, company, location, source])
+        company = get_or_create_named(Company, company_name)
+        location = get_or_create_named(Location, location_name)
+        source = get_or_create_named(Source, source_name)
+        session.add(profile)
         session.commit()
 
         job = Job(

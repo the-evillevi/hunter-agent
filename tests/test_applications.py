@@ -32,7 +32,9 @@ def test_list_applications_returns_fixture_application(
     assert application.applied_at is None
 
 
-def test_applications_partial_renders_application_card(client, create_application) -> None:
+def test_applications_partial_renders_application_card(
+    client, create_application
+) -> None:
     """Expose the partial route and render values instead of an empty card."""
     create_application()
 
