@@ -89,6 +89,18 @@ Use `pytest`. Name test files `test_*.py` and test functions `test_*`. Focus fir
 
 Good early targets: Pydantic config validation, SQLModel session setup, `list_jobs`, and health route behavior.
 
+## Commit Guidelines
+
+Use Conventional Commits for commit messages. Agents should include their model name as the commit scope, for example `git commit -m "feat(gpt5.5): add job search filters" -m "[long description]"` or `git commit -m "fix(fable5): handle missing company names" -m "[long description]"`. The rules are enforced by Commitlint through Husky's `commit-msg` hook.
+
+Keep commits atomic: each commit should be a small, self-contained unit that addresses one task or fix.
+
+Run `pnpm install` after cloning or reinstalling dependencies so Husky can install the local Git hooks. To manually check a message, use:
+
+```sh
+pnpm exec commitlint --edit .git/COMMIT_EDITMSG
+```
+
 ## Security & Configuration Tips
 
 Treat `config.toml` as project configuration, but avoid storing real credentials in it. Keep API keys and session cookies out of commits. The local SQLite database is useful for development, but schema changes should be represented in `sql/` so other contributors can recreate the database.
