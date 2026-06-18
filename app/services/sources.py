@@ -42,6 +42,14 @@ class JobSourceRunContext:
 
 
 @dataclass(frozen=True)
+class ResolvedJobSource:
+    """A source adapter resolved for a scraper run."""
+
+    adapter: JobSourceAdapter
+    db_source: Source | None = None
+
+
+@dataclass(frozen=True)
 class NormalizedJob:
     """Source-independent job shape ready for future persistence.
 
@@ -165,6 +173,10 @@ class JobSourceAdapter(Protocol):
         """Normalize one raw source record."""
 
 
+class UnknownJobSourceError(ValueError):
+    """Raised when a requested source has no registered adapter."""
+
+
 class JobSourceRegistry:
     """Registry for known source adapters."""
 
@@ -174,20 +186,32 @@ class JobSourceRegistry:
     def register(self, adapter: JobSourceAdapter) -> None:
         self._adapters[adapter.identity.name] = adapter
 
-    def resolve_selected(self, source_names: Iterable[str]) -> list[JobSourceAdapter]:
-        return [self._adapters[name] for name in source_names if name in self._adapters]
+    def resolve_selected(self, source_names: Iterable[str]) -> list[ResolvedJobSource]:
+        missing_names = [name for name in source_names if name not in self._adapters]
+        if missing_names:
+            names = ", ".join(sorted(missing_names))
+            raise UnknownJobSourceError(
+                f"no registered job source adapter for: {names}"
+            )
+        return [
+            ResolvedJobSource(adapter=self._adapters[name])
+            for name in source_names
+        ]
 
-    def resolve_enabled(self, session: Session) -> list[JobSourceAdapter]:
+    def resolve_enabled(self, session: Session) -> list[ResolvedJobSource]:
         """Resolve adapters enabled by the database.
 
         Until HNTR-22 adds explicit enablement fields, a row in ``sources`` is
         the minimum viable signal that the source participates in a run.
         """
-        enabled_names = set(session.exec(select(Source.name)).all())
+        db_sources = {
+            source.name: source
+            for source in session.exec(select(Source)).all()
+        }
         return [
-            adapter
+            ResolvedJobSource(adapter=adapter, db_source=db_sources[name])
             for name, adapter in self._adapters.items()
-            if name in enabled_names
+            if name in db_sources
         ]
 
 

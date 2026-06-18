@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 
+import pytest
 from sqlmodel import Session, create_engine
 
 from app.models.source import Source
@@ -14,6 +15,7 @@ from app.services.sources import (
     JobSourceRegistry,
     JobSourceRunContext,
     NormalizedJob,
+    UnknownJobSourceError,
 )
 
 
@@ -86,9 +88,12 @@ def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
         session.add(Source(name="remotive"))
         session.commit()
 
-        adapters = registry.resolve_enabled(session)
+        resolved_sources = registry.resolve_enabled(session)
 
-    assert adapters == [remotive]
+    assert len(resolved_sources) == 1
+    assert resolved_sources[0].adapter == remotive
+    assert resolved_sources[0].db_source is not None
+    assert resolved_sources[0].db_source.name == "remotive"
 
 
 def test_registry_can_resolve_explicit_source_selection_without_database() -> None:
@@ -96,9 +101,19 @@ def test_registry_can_resolve_explicit_source_selection_without_database() -> No
     remotive = FakeAdapter("remotive", [])
     registry.register(remotive)
 
-    adapters = registry.resolve_selected(["remotive"])
+    resolved_sources = registry.resolve_selected(["remotive"])
 
-    assert adapters == [remotive]
+    assert len(resolved_sources) == 1
+    assert resolved_sources[0].adapter == remotive
+    assert resolved_sources[0].db_source is None
+
+
+def test_registry_rejects_unknown_explicit_source_selection() -> None:
+    registry = JobSourceRegistry()
+    registry.register(FakeAdapter("remotive", []))
+
+    with pytest.raises(UnknownJobSourceError, match="adzuna"):
+        registry.resolve_selected(["remotive", "adzuna"])
 
 
 def test_scraper_async_orchestration_uses_registered_adapters() -> None:
