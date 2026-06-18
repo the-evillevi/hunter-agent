@@ -76,10 +76,10 @@ def import_sp500_companies(
                     imported_at=imported_at,
                     authoritative_source_name=authoritative_source_name,
                 )
+                session.add(company)
+                session.commit()
+                session.refresh(company)
                 if changed:
-                    session.add(company)
-                    session.commit()
-                    session.refresh(company)
                     summary.updated += 1
                 else:
                     summary.unchanged += 1
@@ -173,8 +173,11 @@ def apply_company_payload(
     authoritative_source_name: str,
 ) -> bool:
     """Update one company and return whether persisted fields changed."""
-    before = company_state(company)
-    before_without_updated_at = company_state(company, include_updated_at=False)
+    before_without_timestamps = company_state(
+        company,
+        include_seen_at=False,
+        include_updated_at=False,
+    )
     constituent = incoming.constituent
     raw_metadata = constituent.raw_metadata
     incoming_is_authoritative = constituent.source_name == authoritative_source_name
@@ -203,10 +206,16 @@ def apply_company_payload(
         company.sp500_local_currency = constituent.local_currency
         company.sp500_holdings_as_of = metadata_date(raw_metadata, "holdings_as_of")
 
-    if before_without_updated_at != company_state(company, include_updated_at=False):
+    after_without_timestamps = company_state(
+        company,
+        include_seen_at=False,
+        include_updated_at=False,
+    )
+    changed = before_without_timestamps != after_without_timestamps
+    if changed:
         company.sp500_last_updated_at = imported_at
 
-    return before != company_state(company)
+    return changed
 
 
 def mark_removed_companies(
@@ -288,6 +297,7 @@ def set_if_present(company: Company, field_name: str, value: Any) -> None:
 def company_state(
     company: Company,
     *,
+    include_seen_at: bool = True,
     include_updated_at: bool = True,
 ) -> dict[str, Any]:
     state = {
@@ -309,8 +319,9 @@ def company_state(
         "sp500_shares_held": company.sp500_shares_held,
         "sp500_local_currency": company.sp500_local_currency,
         "sp500_holdings_as_of": company.sp500_holdings_as_of,
-        "sp500_last_seen_at": company.sp500_last_seen_at,
     }
+    if include_seen_at:
+        state["sp500_last_seen_at"] = company.sp500_last_seen_at
     if include_updated_at:
         state["sp500_last_updated_at"] = company.sp500_last_updated_at
     return state

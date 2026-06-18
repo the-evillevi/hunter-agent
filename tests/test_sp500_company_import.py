@@ -109,6 +109,31 @@ def test_import_creates_companies_and_is_idempotent_on_rerun(session: Session) -
     assert apple.sp500_last_updated_at == IMPORTED_AT
 
 
+def test_rerun_updates_last_seen_without_changing_last_updated(
+    session: Session,
+) -> None:
+    companies = enrich(
+        constituent(
+            "NVDA",
+            name="NVIDIA CORP",
+            weight=7.9,
+            order=1,
+            identifier="67066G104",
+        )
+    )
+    later_imported_at = datetime(2026, 6, 12, 18, 0)
+
+    first = import_sp500_companies(session, companies, imported_at=IMPORTED_AT)
+    second = import_sp500_companies(session, companies, imported_at=later_imported_at)
+
+    company = session.exec(select(Company).where(Company.ticker == "NVDA")).one()
+    assert first.created == 1
+    assert second.updated == 0
+    assert second.unchanged == 1
+    assert company.sp500_last_seen_at == later_imported_at
+    assert company.sp500_last_updated_at == IMPORTED_AT
+
+
 def test_import_renames_existing_ticker_company_without_replacing_id(
     session: Session,
     create_job,
