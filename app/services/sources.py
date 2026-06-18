@@ -1,4 +1,8 @@
-"""Job source adapter protocol and registry.
+"""Job source lookup, enablement, adapter protocol, and registry.
+
+The database is the runtime source of truth for whether a job source is enabled.
+Config can still provide credentials, but the app should not require a config
+edit just to toggle a source during normal use.
 
 Adapters receive a small explicit ``JobSourceRunContext`` instead of the full
 application config. That keeps source implementations decoupled from unrelated
@@ -17,6 +21,33 @@ from typing import Any, Protocol
 from sqlmodel import Session, select
 
 from app.models.source import Source
+
+
+class SourceNotFoundError(ValueError):
+    """Raised when a source toggle targets an unknown source."""
+
+
+def list_sources(session: Session) -> list[Source]:
+    """Return persisted job sources in a stable display order."""
+    return list(session.exec(select(Source).order_by(Source.name)))
+
+
+def get_source(session: Session, source_id: int) -> Source:
+    """Return one source or raise a small domain error."""
+    source = session.get(Source, source_id)
+    if source is None:
+        raise SourceNotFoundError(f"source {source_id} was not found")
+    return source
+
+
+def set_source_enabled(session: Session, source_id: int, enabled: bool) -> Source:
+    """Persist the enabled flag for a source and return the updated row."""
+    source = get_source(session, source_id)
+    source.enabled = enabled
+    session.add(source)
+    session.commit()
+    session.refresh(source)
+    return source
 
 
 @dataclass(frozen=True)
@@ -39,6 +70,14 @@ class JobSourceRunContext:
     location: str | None = None
     profile_id: int | None = None
     credentials: Mapping[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ResolvedJobSource:
+    """A source adapter resolved for a scraper run."""
+
+    adapter: JobSourceAdapter
+    db_source: Source | None = None
 
 
 @dataclass(frozen=True)
@@ -165,6 +204,10 @@ class JobSourceAdapter(Protocol):
         """Normalize one raw source record."""
 
 
+class UnknownJobSourceError(ValueError):
+    """Raised when a requested source has no registered adapter."""
+
+
 class JobSourceRegistry:
     """Registry for known source adapters."""
 
@@ -174,21 +217,35 @@ class JobSourceRegistry:
     def register(self, adapter: JobSourceAdapter) -> None:
         self._adapters[adapter.identity.name] = adapter
 
-    def resolve_selected(self, source_names: Iterable[str]) -> list[JobSourceAdapter]:
-        return [self._adapters[name] for name in source_names if name in self._adapters]
-
-    def resolve_enabled(self, session: Session) -> list[JobSourceAdapter]:
-        """Resolve adapters enabled by the database.
-
-        Until HNTR-22 adds explicit enablement fields, a row in ``sources`` is
-        the minimum viable signal that the source participates in a run.
-        """
-        enabled_names = set(session.exec(select(Source.name)).all())
+    def resolve_selected(self, source_names: Iterable[str]) -> list[ResolvedJobSource]:
+        missing_names = [name for name in source_names if name not in self._adapters]
+        if missing_names:
+            names = ", ".join(sorted(missing_names))
+            raise UnknownJobSourceError(
+                f"no registered job source adapter for: {names}"
+            )
         return [
-            adapter
-            for name, adapter in self._adapters.items()
-            if name in enabled_names
+            ResolvedJobSource(adapter=self._adapters[name]) for name in source_names
         ]
+
+    def resolve_enabled(self, session: Session) -> list[ResolvedJobSource]:
+        """Resolve adapters enabled by the database."""
+        db_sources = {
+            normalize_source_name(source.name): source
+            for source in session.exec(
+                select(Source).where(Source.enabled).order_by(Source.name)
+            ).all()
+        }
+        return [
+            ResolvedJobSource(adapter=adapter, db_source=db_sources[normalized_name])
+            for name, adapter in self._adapters.items()
+            if (normalized_name := normalize_source_name(name)) in db_sources
+        ]
+
+
+def normalize_source_name(source_name: str) -> str:
+    """Normalize source names for DB display names and adapter identities."""
+    return source_name.strip().casefold()
 
 
 def make_job_identity_hash(
@@ -201,14 +258,18 @@ def make_job_identity_hash(
     location: str | None = None,
 ) -> str:
     """Build a stable minimum identity hash for future dedupe."""
-    identity_parts = [
-        source_name.strip().casefold(),
-        (external_id or "").strip().casefold(),
-        (url or "").strip().casefold(),
-        (title or "").strip().casefold(),
-        (company or "").strip().casefold(),
-        (location or "").strip().casefold(),
-    ]
+    normalized_source_name = normalize_source_name(source_name)
+    if external_id:
+        identity_parts = [normalized_source_name, external_id.strip().casefold()]
+    elif url:
+        identity_parts = [normalized_source_name, url.strip().casefold()]
+    else:
+        identity_parts = [
+            normalized_source_name,
+            (title or "").strip().casefold(),
+            (company or "").strip().casefold(),
+            (location or "").strip().casefold(),
+        ]
     return sha256("|".join(identity_parts).encode("utf-8")).hexdigest()
 
 
