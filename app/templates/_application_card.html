@@ -7,9 +7,7 @@
       <h3 class="text-base-content font-semibold">
         APP-{{ application.id }}: {{ application.job_title }}
       </h3>
-      <p class="text-base-content/60 mt-1 text-sm">
-        {{ application.company }}
-      </p>
+      <p class="text-base-content/60 mt-1 text-sm">{{ application.company }}</p>
 
       <span class="badge badge-info badge-outline mt-3">
         {{ application.status }}
@@ -38,7 +36,7 @@
           type="submit"
           name="status"
           value="{{ status.value }}"
-          class="btn btn-sm{% if status == application.status %} btn-primary{% else %} btn-ghost{% endif %}"
+          class="btn btn-sm{% if status == application.status %}btn-primary{% else %}btn-ghost{% endif %}"
           {% if status == application.status %}aria-current="true"{% endif %}
         >
           {{ status.value }}

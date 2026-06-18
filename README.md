@@ -307,3 +307,23 @@ This project should create practice with:
 - observability for score drift and source health
 
 _Last updated: README aligned with the current repo structure and target quest roadmap._
+
+## License
+
+This project is source-available under the Hippocratic License 3.0 with the Copyleft, Workers on Board of Directors, Military Activities, and Mass Surveillance modules enabled.
+
+## AI Assistance
+
+This project was developed with substantial assistance from AI coding tools, including but not limited to:
+
+- GPT5.5
+- Sonnet 4.6
+- DeepSeek V4 Flash Free
+- Big Pickle
+
+The maintainer is responsible for the project’s architecture, prompts, review,
+testing, integration, documentation, and published form. AI-generated code has
+been reviewed and modified as needed before inclusion.
+
+Use of AI assistance does not grant any additional permissions beyond this
+repository’s license.

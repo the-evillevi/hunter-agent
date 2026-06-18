@@ -230,5 +230,13 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
             JOIN companies ON companies.id = jobs.company_id
             """
         ).fetchone()
+        sources = connection.execute(
+            """
+            SELECT name, enabled
+            FROM sources
+            ORDER BY name
+            """
+        ).fetchall()
 
     assert application == ("AI/ML Engineer", "Kavak", "pending", None)
+    assert sources == [("Adzuna", 1), ("Remotive", 1)]
