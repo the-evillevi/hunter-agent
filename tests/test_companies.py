@@ -88,6 +88,14 @@ def test_sp500_tier_is_constrained(session: Session) -> None:
         session.commit()
 
 
+def test_sp500_rank_status_is_constrained(session: Session) -> None:
+    """Only the agreed S&P rank provenance statuses are accepted."""
+    session.add(Company(name="Ranked Corp", ticker="RANK", sp500_rank_status="guessed"))
+
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
 def test_is_sp500_has_database_default_and_boolean_constraint(
     session: Session,
 ) -> None:
