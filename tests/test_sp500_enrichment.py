@@ -164,6 +164,31 @@ def test_missing_weight_does_not_fabricate_rank_or_top_bucket_by_default() -> No
     ]
 
 
+def test_missing_weight_does_not_discard_weight_derived_ranks() -> None:
+    companies = [
+        constituent("AAPL", weight=6.4, order=2, name="Apple Inc."),
+        constituent("ACME", weight=None, order=1, source=WIKIPEDIA),
+        constituent("NVDA", weight=7.9, order=3, name="NVIDIA CORP"),
+    ]
+
+    enriched = enrich_sp500_rank_and_tier(companies)
+
+    assert [
+        (
+            company.symbol,
+            company.sp500_weight_rank,
+            company.sp500_tier,
+            company.sp500_rank_source,
+            company.sp500_rank_status,
+        )
+        for company in enriched
+    ] == [
+        ("NVDA", 1, "mag7", "ssga_spy_holdings:weight", WEIGHT_DERIVED_RANK_STATUS),
+        ("AAPL", 2, "mag7", "ssga_spy_holdings:weight", WEIGHT_DERIVED_RANK_STATUS),
+        ("ACME", None, None, None, UNAVAILABLE_RANK_STATUS),
+    ]
+
+
 def test_fallback_source_order_rank_is_opt_in_and_marked() -> None:
     companies = [
         constituent("BETA", weight=None, order=2, source=WIKIPEDIA),

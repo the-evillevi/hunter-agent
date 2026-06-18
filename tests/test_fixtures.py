@@ -10,6 +10,8 @@ from app.db.database import get_session
 from app.main import app
 from app.models.company import Company
 from app.models.job import Job
+from app.models.location import Location
+from app.models.source import Source
 
 
 def test_isolated_session_enforces_foreign_keys(session: Session) -> None:
@@ -32,6 +34,26 @@ def test_isolated_session_enforces_foreign_keys(session: Session) -> None:
 def test_isolated_session_starts_empty(session: Session) -> None:
     """Each test receives a rebuilt schema without data from previous tests."""
     assert session.exec(select(Company)).all() == []
+
+
+def test_create_job_reuses_named_related_rows(session: Session, create_job) -> None:
+    """Repeated fixture calls should not trip unique name constraints."""
+    first_job = create_job()
+    second_job = create_job(title="Senior AI Engineer")
+
+    assert session.exec(select(Job)).all() == [first_job, second_job]
+    assert session.exec(select(Company)).all() == [
+        session.get(Company, first_job.company_id)
+    ]
+    assert session.exec(select(Location)).all() == [
+        session.get(Location, first_job.location_id)
+    ]
+    assert session.exec(select(Source)).all() == [
+        session.get(Source, first_job.source_id)
+    ]
+    assert second_job.company_id == first_job.company_id
+    assert second_job.location_id == first_job.location_id
+    assert second_job.source_id == first_job.source_id
 
 
 def test_test_client_uses_and_clears_session_override(client) -> None:

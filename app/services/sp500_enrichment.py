@@ -69,44 +69,54 @@ def enrich_sp500_rank_and_tier(
     fallback source-order rank is opt-in and marked so downstream code never
     mistakes enrichment order for true S&P weight rank.
     """
-    if all(constituent.weight is not None for constituent in constituents):
-        ordered = sorted(
-            constituents,
-            key=lambda company: (-float(company.weight), company.order, company.symbol),
+    weighted_constituents = [
+        constituent for constituent in constituents if constituent.weight is not None
+    ]
+    unweighted_constituents = [
+        constituent for constituent in constituents if constituent.weight is None
+    ]
+    ordered_weighted = sorted(
+        weighted_constituents,
+        key=lambda company: (-float(company.weight), company.order, company.symbol),
+    )
+    enriched = [
+        enrich_constituent(
+            constituent,
+            weight_rank=rank,
+            rank_source=f"{constituent.source_name}:weight",
+            rank_status=WEIGHT_DERIVED_RANK_STATUS,
         )
-        return [
-            enrich_constituent(
-                constituent,
-                weight_rank=rank,
-                rank_source=f"{constituent.source_name}:weight",
-                rank_status=WEIGHT_DERIVED_RANK_STATUS,
-            )
-            for rank, constituent in enumerate(ordered, start=1)
-        ]
+        for rank, constituent in enumerate(ordered_weighted, start=1)
+    ]
+
+    if not unweighted_constituents:
+        return enriched
 
     if allow_fallback_rank:
         ordered = sorted(
-            constituents, key=lambda company: (company.order, company.symbol)
+            unweighted_constituents, key=lambda company: (company.order, company.symbol)
         )
-        return [
+        enriched.extend(
             enrich_constituent(
                 constituent,
                 weight_rank=rank,
                 rank_source=f"{constituent.source_name}:source_order",
                 rank_status=FALLBACK_SOURCE_ORDER_RANK_STATUS,
             )
-            for rank, constituent in enumerate(ordered, start=1)
-        ]
+            for rank, constituent in enumerate(ordered, start=len(enriched) + 1)
+        )
+        return enriched
 
-    return [
+    enriched.extend(
         enrich_constituent(
             constituent,
             weight_rank=None,
             rank_source=None,
             rank_status=UNAVAILABLE_RANK_STATUS,
         )
-        for constituent in constituents
-    ]
+        for constituent in unweighted_constituents
+    )
+    return enriched
 
 
 def enrich_constituent(

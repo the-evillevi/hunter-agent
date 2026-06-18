@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 
+import pytest
 from sqlmodel import Session, create_engine
 
 from app.models.source import Source
@@ -14,6 +15,8 @@ from app.services.sources import (
     JobSourceRegistry,
     JobSourceRunContext,
     NormalizedJob,
+    UnknownJobSourceError,
+    make_job_identity_hash,
 )
 
 
@@ -77,6 +80,63 @@ def test_normalized_job_keeps_current_job_fields_and_source_metadata() -> None:
     assert job.raw_metadata == {"salary": "$100k"}
 
 
+def test_identity_hash_prefers_external_id_over_changing_job_text() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="remotive",
+        external_id="remote-123",
+        url="https://jobs.example/ai-engineer",
+        title="AI Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="remotive",
+        external_id="remote-123",
+        url="https://jobs.example/senior-ai-engineer",
+        title="Senior AI Engineer",
+        company="HNTR Labs Inc.",
+        location="Remote, US",
+    )
+
+    assert updated_hash == first_hash
+
+
+def test_identity_hash_prefers_url_when_external_id_is_missing() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="adzuna",
+        url="https://jobs.example/data-engineer",
+        title="Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="adzuna",
+        url="https://jobs.example/data-engineer",
+        title="Senior Data Engineer",
+        company="HNTR Labs Inc.",
+        location="Remote, US",
+    )
+
+    assert updated_hash == first_hash
+
+
+def test_identity_hash_falls_back_to_job_text_without_stable_identifiers() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="manual",
+        title="Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="manual",
+        title="Senior Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+
+    assert updated_hash != first_hash
+
+
 def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
     registry = JobSourceRegistry()
     remotive = FakeAdapter("remotive", [])
@@ -85,12 +145,36 @@ def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
     registry.register(adzuna)
 
     with make_session() as session:
-        session.add(Source(name="remotive"))
+        session.add(Source(name="Remotive"))
         session.commit()
 
-        adapters = registry.resolve_enabled(session)
+        resolved_sources = registry.resolve_enabled(session)
 
-    assert adapters == [remotive]
+    assert len(resolved_sources) == 1
+    assert resolved_sources[0].adapter == remotive
+    assert resolved_sources[0].db_source is not None
+    assert resolved_sources[0].db_source.name == "Remotive"
+
+
+def test_registry_excludes_disabled_database_sources() -> None:
+    registry = JobSourceRegistry()
+    remotive = FakeAdapter("remotive", [])
+    adzuna = FakeAdapter("adzuna", [])
+    registry.register(remotive)
+    registry.register(adzuna)
+
+    with make_session() as session:
+        session.add(Source(name="Adzuna", enabled=False))
+        session.add(Source(name="Remotive", enabled=True))
+        session.commit()
+
+        resolved_sources = registry.resolve_enabled(session)
+
+    assert [resolved_source.adapter for resolved_source in resolved_sources] == [
+        remotive
+    ]
+    assert resolved_sources[0].db_source is not None
+    assert resolved_sources[0].db_source.name == "Remotive"
 
 
 def test_registry_can_resolve_explicit_source_selection_without_database() -> None:
@@ -98,9 +182,19 @@ def test_registry_can_resolve_explicit_source_selection_without_database() -> No
     remotive = FakeAdapter("remotive", [])
     registry.register(remotive)
 
-    adapters = registry.resolve_selected(["remotive"])
+    resolved_sources = registry.resolve_selected(["remotive"])
 
-    assert adapters == [remotive]
+    assert len(resolved_sources) == 1
+    assert resolved_sources[0].adapter == remotive
+    assert resolved_sources[0].db_source is None
+
+
+def test_registry_rejects_unknown_explicit_source_selection() -> None:
+    registry = JobSourceRegistry()
+    registry.register(FakeAdapter("remotive", []))
+
+    with pytest.raises(UnknownJobSourceError, match="adzuna"):
+        registry.resolve_selected(["remotive", "adzuna"])
 
 
 def test_scraper_async_orchestration_uses_registered_adapters() -> None:
