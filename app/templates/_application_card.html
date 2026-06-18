@@ -36,7 +36,7 @@
           type="submit"
           name="status"
           value="{{ status.value }}"
-          class="btn btn-sm{% if status == application.status %}btn-primary{% else %}btn-ghost{% endif %}"
+          class="btn btn-sm {% if status == application.status %}btn-primary{% else %}btn-ghost{% endif %}"
           {% if status == application.status %}aria-current="true"{% endif %}
         >
           {{ status.value }}
