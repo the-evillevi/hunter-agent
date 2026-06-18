@@ -3,6 +3,7 @@
 from datetime import date, datetime
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
@@ -85,6 +86,23 @@ def test_sp500_tier_is_constrained(session: Session) -> None:
 
     with pytest.raises(IntegrityError):
         session.commit()
+
+
+def test_is_sp500_has_database_default_and_boolean_constraint(
+    session: Session,
+) -> None:
+    """SQLModel-created schemas match the committed SQL boolean behavior."""
+    session.exec(text("INSERT INTO companies (name) VALUES ('Default Corp')"))
+    is_sp500 = session.exec(
+        text("SELECT is_sp500 FROM companies WHERE name = 'Default Corp'")
+    ).one()[0]
+
+    assert is_sp500 == 0
+
+    with pytest.raises(IntegrityError):
+        session.exec(
+            text("INSERT INTO companies (name, is_sp500) VALUES ('Bad Corp', 2)")
+        )
 
 
 def test_removed_sp500_company_history_preserves_existing_company_references(

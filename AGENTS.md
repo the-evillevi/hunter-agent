@@ -8,19 +8,9 @@
 
 Tests live in `tests/` and should mirror the app structure, for example `tests/test_jobs.py`.
 
-## Quest Tracking
+## Issue Tracking
 
-The roadmap is tracked in the Obsidian vault. `vault/HNTR Quests.base` is the canonical quest list, and each quest note lives in `vault/quests/` with an `HNTR-*` ID.
-
-The HNTR Base is an Obsidian Base that reads Markdown frontmatter from quest notes. Agents should treat the Base as a view/index, not as the place where quest data primarily lives. Update quest note properties first; the Base should reflect those notes through its `quests` folder filter.
-
-Each quest note should include `id`, `title`, `status`, `area`, `points`, `order`, and `tags`. Use `status: TODO` for planned work and `status: DONE` only when the quest is actually complete. Keep `order` numeric and continue the existing sequence when adding new quests.
-
-When working on roadmap items, preserve the `HNTR-*` IDs and update the matching quest note properties when status or scope changes. Do not reintroduce task-tracking tables in `README.md`; README is for human orientation and should point to the vault/base instead.
-
-Quest notes use the Proximity Scale in their `points` property: `Cantrip`, `Uncharted Territory`, or `Here Be Dragons`.
-
-Keep README documentation honest about current state versus target vision. `pyproject.toml`, `sql/hunter-agent.sql`, and the existing `app/` structure are the sources of truth for implemented behavior.
+The roadmap is tracked in Linear. Use your Linear skill to access the Hunter Team, Hunter Agent Project's issues, which correspond to this repository.
 
 ## Build, Test, and Development Commands
 
@@ -79,15 +69,27 @@ pnpm format:check
 
 ## Coding Style & Naming Conventions
 
-Use Python 3.14, four-space indentation, SQLModel for database access, and Pydantic for validation at boundaries such as `config.toml`, forms, and scraper payloads. Keep modules small and beginner-readable. Prefer explicit function names such as `list_jobs`, `get_session`, and `scrape_jobs`.
+Use Python 3.14, `uvx ruff format`, SQLModel for database access, and Pydantic for validation at boundaries such as `config.toml`, forms, and scraper payloads. Keep modules small and beginner-readable. Prefer explicit function names such as `list_jobs`, `get_session`, and `scrape_jobs`.
 
-Use `snake_case` for files, functions, variables, and route helpers. Use `PascalCase` for models such as `JobRecord` and `AppConfig`. Prefer Tailwind utility classes in templates over hand-written CSS. Keep comments learning-focused: explain why a file or function exists, then leave `TODO` markers for unfinished implementation.
+Use `snake_case` for files, functions, variables, and route helpers. Use `PascalCase` for models such as `JobRecord` and `AppConfig`. Prefer Tailwind and DaisyUI utility classes in templates over hand-written CSS. Keep comments learning-focused: explain why a file or function exists, then leave `TODO` markers for unfinished implementation.
 
 ## Testing Guidelines
 
 Use `pytest`. Name test files `test_*.py` and test functions `test_*`. Focus first on config validation, service/database behavior, and route rendering. FastAPI route tests use `fastapi.testclient.TestClient`.
 
 Good early targets: Pydantic config validation, SQLModel session setup, `list_jobs`, and health route behavior.
+
+## Commit Guidelines
+
+Use Conventional Commits for commit messages. Agents should include their model name as the commit scope and always include a long description, for example `git commit -m "feat(gpt5.5): add job search filters" -m "[long description]"` or `git commit -m "fix(fable5): handle missing company names" -m "[long description]"`. The rules are enforced by Commitlint through Husky's `commit-msg` hook.
+
+Keep commits atomic: each commit should be a small, self-contained unit that addresses one task or fix.
+
+Run `pnpm install` after cloning or reinstalling dependencies so Husky can install the local Git hooks. To manually check a message, use:
+
+```sh
+pnpm exec commitlint --edit .git/COMMIT_EDITMSG
+```
 
 ## Security & Configuration Tips
 

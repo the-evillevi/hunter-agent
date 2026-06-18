@@ -96,11 +96,11 @@ class NormalizedCompanyConstituent:
             "sp500_provider": self.source_name,
             "sp500_identifier": self.identifier,
             "sp500_sedol": self.sedol,
+            "sector": self.sector,
             "sp500_weight": self.weight,
             "sp500_shares_held": self.shares_held,
             "sp500_local_currency": self.local_currency,
             "is_sp500": True,
-            "raw_metadata": self.raw_metadata,
         }
 
 
@@ -124,6 +124,10 @@ class CompanySourceAdapter(Protocol):
         """Normalize one raw provider row."""
 
 
+class UnknownCompanySourceError(ValueError):
+    """Raised when a requested company source has no registered adapter."""
+
+
 class CompanySourceRegistry:
     """Registry for company-source adapters."""
 
@@ -138,7 +142,14 @@ class CompanySourceRegistry:
         source_names: Iterable[str],
     ) -> list[CompanySourceAdapter]:
         """Resolve adapters from an explicit source list in the given order."""
-        return [self._adapters[name] for name in source_names if name in self._adapters]
+        requested_names = list(source_names)
+        missing_names = [name for name in requested_names if name not in self._adapters]
+        if missing_names:
+            names = ", ".join(sorted(missing_names))
+            raise UnknownCompanySourceError(
+                f"no registered company source adapter for: {names}"
+            )
+        return [self._adapters[name] for name in requested_names]
 
 
 async def fetch_company_constituents(

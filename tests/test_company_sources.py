@@ -11,6 +11,7 @@ from app.services.company_sources import (
     CompanySourceIdentity,
     CompanySourceRegistry,
     NormalizedCompanyConstituent,
+    UnknownCompanySourceError,
     fetch_company_constituents,
 )
 
@@ -79,8 +80,10 @@ def test_normalized_company_payload_uses_hntr_33_compatible_names() -> None:
         order=2,
         identifier="037833100",
         sedol="2046251",
+        sector="Information Technology",
         shares_held=179_731_797.0,
         local_currency="USD",
+        raw_metadata={"Local Currency": "USD"},
     )
 
     assert company.to_company_payload() == {
@@ -90,11 +93,11 @@ def test_normalized_company_payload_uses_hntr_33_compatible_names() -> None:
         "sp500_provider": "ssga_spy_holdings",
         "sp500_identifier": "037833100",
         "sp500_sedol": "2046251",
+        "sector": "Information Technology",
         "sp500_weight": 6.721774,
         "sp500_shares_held": 179_731_797.0,
         "sp500_local_currency": "USD",
         "is_sp500": True,
-        "raw_metadata": {},
     }
 
 
@@ -108,6 +111,18 @@ def test_company_source_registry_resolves_explicit_source_list() -> None:
     adapters = registry.resolve_selected(["wikipedia_sp500_enrichment"])
 
     assert adapters == [wikipedia]
+
+
+def test_company_source_registry_rejects_unknown_manual_source() -> None:
+    registry = CompanySourceRegistry()
+    registry.register(FakeCompanySourceAdapter("ssga_spy_holdings", []))
+
+    try:
+        registry.resolve_selected(["ssga_spy_holdings", "slickcharts_sp500"])
+    except UnknownCompanySourceError as error:
+        assert "slickcharts_sp500" in str(error)
+    else:
+        raise AssertionError("Expected unknown company source to raise")
 
 
 def test_company_source_orchestration_fetches_and_normalizes_with_app_config() -> None:

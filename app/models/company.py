@@ -25,6 +25,7 @@ class Company(SQLModel, table=True):
             "('weight_derived', 'fallback_source_order', 'unavailable')",
             name="ck_companies_sp500_rank_status",
         ),
+        CheckConstraint("is_sp500 IN (0, 1)", name="ck_companies_is_sp500"),
     )
 
     id: int | None = Field(default=None, primary_key=True)
@@ -39,7 +40,7 @@ class Company(SQLModel, table=True):
     founded: str | None = None
     sp500_source: str | None = None
     sp500_source_url: str | None = None
-    is_sp500: bool = False
+    is_sp500: bool = Field(default=False, sa_column_kwargs={"server_default": "0"})
     sp500_weight_rank: int | None = None
     sp500_tier: str | None = None
     sp500_rank_source: str | None = None
