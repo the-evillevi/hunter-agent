@@ -31,6 +31,8 @@ def test_company_model_stores_sp500_metadata(session: Session) -> None:
         is_sp500=True,
         sp500_weight_rank=1,
         sp500_tier="mag7",
+        sp500_rank_source="ssga_spy_holdings:weight",
+        sp500_rank_status="weight_derived",
         sp500_provider="SSGA",
         sp500_identifier="037833100",
         sp500_sedol="2046251",
@@ -50,6 +52,8 @@ def test_company_model_stores_sp500_metadata(session: Session) -> None:
     assert company.ticker == "AAPL"
     assert company.cik == "0000320193"
     assert company.sp500_tier == "mag7"
+    assert company.sp500_rank_source == "ssga_spy_holdings:weight"
+    assert company.sp500_rank_status == "weight_derived"
     assert company.sp500_identifier == "037833100"
     assert company.sp500_holdings_as_of == date(2026, 6, 9)
 
@@ -79,6 +83,14 @@ def test_company_cik_is_nullable(session: Session) -> None:
 def test_sp500_tier_is_constrained(session: Session) -> None:
     """Only the agreed S&P 500 tier buckets are accepted."""
     session.add(Company(name="Tesla Inc.", ticker="TSLA", sp500_tier="mega"))
+
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
+def test_sp500_rank_status_is_constrained(session: Session) -> None:
+    """Only the agreed S&P rank provenance statuses are accepted."""
+    session.add(Company(name="Ranked Corp", ticker="RANK", sp500_rank_status="guessed"))
 
     with pytest.raises(IntegrityError):
         session.commit()

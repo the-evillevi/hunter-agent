@@ -119,6 +119,8 @@ then likely Slickcharts. The `sp500_tier` values are constrained to `mag7`,
 `top100`, `top200`, `top300`, `top400`, and `top500`; `mag7` means Apple,
 Microsoft, Nvidia, Amazon, Alphabet, Meta, and Tesla, while `top100` excludes
 those Magnificent 7 companies and the remaining buckets follow rank ranges.
+`sp500_rank_source` and `sp500_rank_status` distinguish true SSGA/SPY
+weight-derived rank from explicitly marked fallback/source-order enrichment.
 Companies removed from the index are represented in `removed_sp500_companies`
 with a removal date instead of being folded into the active company row.
 

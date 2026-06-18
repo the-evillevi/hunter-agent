@@ -38,7 +38,7 @@ class NormalizedCompanyConstituent:
 
     symbol: str
     name: str
-    weight: float
+    weight: float | None
     order: int
     source: CompanySourceIdentity
     identifier: str | None = None
@@ -55,7 +55,7 @@ class NormalizedCompanyConstituent:
         source: CompanySourceIdentity,
         symbol: str,
         name: str,
-        weight: float,
+        weight: float | None,
         order: int,
         identifier: str | None = None,
         sedol: str | None = None,
@@ -98,7 +98,6 @@ class NormalizedCompanyConstituent:
             "sp500_sedol": self.sedol,
             "sector": self.sector,
             "sp500_weight": self.weight,
-            "sp500_weight_rank": self.order,
             "sp500_shares_held": self.shares_held,
             "sp500_local_currency": self.local_currency,
             "is_sp500": True,
