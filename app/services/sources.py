@@ -194,8 +194,7 @@ class JobSourceRegistry:
                 f"no registered job source adapter for: {names}"
             )
         return [
-            ResolvedJobSource(adapter=self._adapters[name])
-            for name in source_names
+            ResolvedJobSource(adapter=self._adapters[name]) for name in source_names
         ]
 
     def resolve_enabled(self, session: Session) -> list[ResolvedJobSource]:
@@ -205,8 +204,7 @@ class JobSourceRegistry:
         the minimum viable signal that the source participates in a run.
         """
         db_sources = {
-            source.name: source
-            for source in session.exec(select(Source)).all()
+            source.name: source for source in session.exec(select(Source)).all()
         }
         return [
             ResolvedJobSource(adapter=adapter, db_source=db_sources[name])
@@ -225,14 +223,18 @@ def make_job_identity_hash(
     location: str | None = None,
 ) -> str:
     """Build a stable minimum identity hash for future dedupe."""
-    identity_parts = [
-        source_name.strip().casefold(),
-        (external_id or "").strip().casefold(),
-        (url or "").strip().casefold(),
-        (title or "").strip().casefold(),
-        (company or "").strip().casefold(),
-        (location or "").strip().casefold(),
-    ]
+    normalized_source_name = source_name.strip().casefold()
+    if external_id:
+        identity_parts = [normalized_source_name, external_id.strip().casefold()]
+    elif url:
+        identity_parts = [normalized_source_name, url.strip().casefold()]
+    else:
+        identity_parts = [
+            normalized_source_name,
+            (title or "").strip().casefold(),
+            (company or "").strip().casefold(),
+            (location or "").strip().casefold(),
+        ]
     return sha256("|".join(identity_parts).encode("utf-8")).hexdigest()
 
 

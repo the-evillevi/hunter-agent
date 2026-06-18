@@ -16,6 +16,7 @@ from app.services.sources import (
     JobSourceRunContext,
     NormalizedJob,
     UnknownJobSourceError,
+    make_job_identity_hash,
 )
 
 
@@ -27,7 +28,9 @@ class FakeAdapter:
         self.raw_jobs = list(raw_jobs)
         self.seen_contexts: list[JobSourceRunContext] = []
 
-    async def fetch(self, context: JobSourceRunContext) -> Sequence[Mapping[str, object]]:
+    async def fetch(
+        self, context: JobSourceRunContext
+    ) -> Sequence[Mapping[str, object]]:
         self.seen_contexts.append(context)
         return self.raw_jobs
 
@@ -75,6 +78,63 @@ def test_normalized_job_keeps_current_job_fields_and_source_metadata() -> None:
     assert job.hash
     assert job.identity_hash == job.hash
     assert job.raw_metadata == {"salary": "$100k"}
+
+
+def test_identity_hash_prefers_external_id_over_changing_job_text() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="remotive",
+        external_id="remote-123",
+        url="https://jobs.example/ai-engineer",
+        title="AI Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="remotive",
+        external_id="remote-123",
+        url="https://jobs.example/senior-ai-engineer",
+        title="Senior AI Engineer",
+        company="HNTR Labs Inc.",
+        location="Remote, US",
+    )
+
+    assert updated_hash == first_hash
+
+
+def test_identity_hash_prefers_url_when_external_id_is_missing() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="adzuna",
+        url="https://jobs.example/data-engineer",
+        title="Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="adzuna",
+        url="https://jobs.example/data-engineer",
+        title="Senior Data Engineer",
+        company="HNTR Labs Inc.",
+        location="Remote, US",
+    )
+
+    assert updated_hash == first_hash
+
+
+def test_identity_hash_falls_back_to_job_text_without_stable_identifiers() -> None:
+    first_hash = make_job_identity_hash(
+        source_name="manual",
+        title="Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+    updated_hash = make_job_identity_hash(
+        source_name="manual",
+        title="Senior Data Engineer",
+        company="HNTR Labs",
+        location="Remote",
+    )
+
+    assert updated_hash != first_hash
 
 
 def test_registry_resolves_adapters_from_enabled_database_sources() -> None:
