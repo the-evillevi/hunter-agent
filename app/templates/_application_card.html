@@ -1,0 +1,53 @@
+<article
+  id="application-{{ application.id }}"
+  class="rounded-box border-base-300 bg-base-100 border p-4"
+>
+  <div class="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+    <div>
+      <h3 class="text-base-content font-semibold">
+        APP-{{ application.id }}: {{ application.job_title }}
+      </h3>
+      <p class="text-base-content/60 mt-1 text-sm">{{ application.company }}</p>
+
+      <span class="badge badge-info badge-outline mt-3">
+        {{ application.status }}
+      </span>
+    </div>
+
+    <div class="text-base-content/70 text-sm lg:text-right">
+      {% if application.cv_path is not none %}
+        <p>{{ application.cv_path }}</p>
+      {% endif %}
+
+      {% if application.applied_at is not none %}
+        <p>Applied at: {{ application.applied_at }}</p>
+      {% endif %}
+      <p>Last updated: {{ application.last_updated }}</p>
+    </div>
+
+    <form
+      class="flex flex-wrap gap-2 lg:col-span-2"
+      hx-patch="/applications/{{ application.id }}"
+      hx-target="closest article"
+      hx-swap="outerHTML"
+    >
+      {% for status in application_statuses %}
+        <button
+          type="submit"
+          name="status"
+          value="{{ status.value }}"
+          class="btn btn-sm {% if status == application.status %}btn-primary{% else %}btn-ghost{% endif %}"
+          {% if status == application.status %}aria-current="true"{% endif %}
+        >
+          {{ status.value }}
+        </button>
+      {% endfor %}
+    </form>
+
+    {% if application.notes is not none %}
+      <p class="text-base-content/70 text-sm lg:col-span-2">
+        {{ application.notes }}
+      </p>
+    {% endif %}
+  </div>
+</article>
