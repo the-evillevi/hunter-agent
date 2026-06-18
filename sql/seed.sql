@@ -74,8 +74,8 @@ INSERT INTO locations (name) VALUES ('Guadalajara, GDL');
 INSERT INTO locations (name) VALUES ('Querétaro, QRO');
 
 -- Sources
-INSERT INTO sources (name) VALUES ('Adzuna');
-INSERT INTO sources (name) VALUES ('Remotive');
+INSERT INTO sources (name, enabled) VALUES ('Adzuna', 1);
+INSERT INTO sources (name, enabled) VALUES ('Remotive', 1);
 
 -- Keywords
 INSERT INTO keywords (name) VALUES ('Python');

@@ -1,15 +1,13 @@
 # hunter-agent
 
-A small FastAPI, SQLite, SQLModel, and HTMX project for learning by building a
+A FastAPI, SQLite, SQLModel, and HTMX project for learning by building a
 job tracker.
 
 The long-term vision is a local-first job application assistant that will crawl
 job sources, score listings against target profiles, prepare application
-materials, and track outcomes in SQLite. The current repo is intentionally
-smaller: it is growing from a tested FastAPI/SQLModel foundation toward that
-vision one quest at a time.
+materials, and track outcomes in SQLite.
 
-> Automated job application assistant · MacBook Pro M5 16GB · Ollama · Python · SQLite
+> Automated job application assistant · MacBook Pro M5 16GB · Codex/Ollama · Python · SQLite
 
 ## Current State
 
@@ -21,7 +19,7 @@ The application currently uses:
 | Package manager | uv                                                        |
 | Web app         | FastAPI                                                   |
 | Templates       | Jinja                                                     |
-| Styling         | TailwindCSS via pnpm                                      |
+| Styling         | TailwindCSS and Daisy UI via pnpm                         |
 | Database        | SQLite + SQLModel                                         |
 | Config          | TOML + Pydantic validation                                |
 | Tests           | pytest + FastAPI TestClient                               |
@@ -58,15 +56,12 @@ Run the local app:
 uv run uvicorn app.main:app --reload
 ```
 
-## Quest Roadmap
+## Issue Tracking
 
-The project roadmap lives in the Obsidian vault at `vault/`. Open
-`vault/HNTR Quests.base` to see the canonical quest list.
+The project roadmap and issue tracking lives in Linear
 
-Work through quests in `order` sequence. The application exercises in
-`tests/test_applications.py` are skipped initially so the existing test suite
-stays green. Remove a test's `@pytest.mark.skip` decorator when you start its
-related quest.
+- Team: Hunter
+- Project: Hunter Agent
 
 ## Test Practice
 
@@ -175,7 +170,8 @@ CREATE TABLE locations (
 
 CREATE TABLE sources (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL UNIQUE,
+  enabled BOOLEAN NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1))
 );
 
 CREATE TABLE keywords (
@@ -311,6 +307,7 @@ when their implementation work begins:
 | Scheduling         | APScheduler                   | Runs inside the app, no cron needed           |
 | Browser automation | Playwright                    | Handles JS-heavy application forms            |
 | Local AI           | Ollama + Ollama Python client | Private local inference on Apple Silicon      |
+| AI Provider        | Codex                         | GPT5.5 for heavy lifting.                     |
 | CV generation      | python-docx + PDF export path | Edit Word master and export application files |
 | Semantic scoring   | sentence-transformers         | Local embedding-based similarity              |
 | Keyword scoring    | rank-bm25                     | Deterministic keyword overlap                 |
@@ -322,8 +319,8 @@ the same time.
 
 | Task         | Candidate model | Notes                                      |
 | ------------ | --------------- | ------------------------------------------ |
-| Scoring      | qwen2.5:7b      | Fast enough for larger batches of listings |
-| CV tailoring | qwen2.5:14b     | Better writing for jobs above threshold    |
+| Scoring      | qwen2.5:14b     | Fast enough for larger batches of listings |
+| CV tailoring | GPT5.5          | Better writing for jobs above threshold    |
 
 ## Future Architecture Notes
 
@@ -365,4 +362,19 @@ This project should create practice with:
 - model benchmarking across keyword, semantic, and LLM scores
 - observability for score drift and source health
 
-_Last updated: README aligned with the current repo structure and target quest roadmap._
+## License
+
+This project is source-available under the Hippocratic License 3.0 with the Copyleft, Workers on Board of Directors, Military Activities, and Mass Surveillance modules enabled.
+
+## AI Assistance
+
+This project was developed with substantial assistance from AI coding tools, including but not limited to:
+
+- GPT5.5
+- Sonnet 4.6
+- DeepSeek V4 Flash Free
+- Big Pickle
+
+The maintainer is responsible for the project’s architecture, prompts, review,
+testing, integration, documentation, and published form. AI-generated code has
+been reviewed and modified as needed before inclusion.

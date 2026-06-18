@@ -1,0 +1,30 @@
+{% if sources %}
+  <div class="grid gap-3 sm:grid-cols-2">
+    {% for source in sources %}
+      <article class="rounded-box border-base-300 bg-base-100 border p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base-content font-semibold">{{ source.name }}</h3>
+            <span
+              class="badge {% if source.enabled %}badge-success{% else %}badge-outline{% endif %} mt-2"
+            >
+              {% if source.enabled %}Enabled{% else %}Disabled{% endif %}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            class="btn btn-sm {% if source.enabled %}btn-outline{% else %}btn-primary{% endif %}"
+            hx-post="/sources/{{ source.id }}/toggle?enabled={{ 'false' if source.enabled else 'true' }}"
+            hx-target="#sources-panel"
+            hx-swap="innerHTML"
+          >
+            {% if source.enabled %}Disable{% else %}Enable{% endif %}
+          </button>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-base-content/60 text-sm">No job sources configured yet.</p>
+{% endif %}
