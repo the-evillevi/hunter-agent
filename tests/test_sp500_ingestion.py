@@ -203,6 +203,34 @@ def test_normalization_failure_does_not_mark_existing_company_removed(
     assert company.is_sp500 is True
 
 
+def test_upsert_failure_returns_structured_failure(
+    session: Session,
+    monkeypatch,
+) -> None:
+    def fail_import(*args, **kwargs) -> None:
+        del args, kwargs
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(
+        "app.services.sp500_ingestion.import_sp500_companies",
+        fail_import,
+    )
+
+    summary = asyncio.run(
+        run_sp500_ingestion(
+            session,
+            registry=registry_with(FakeCompanySource(rows=[company_row()])),
+            now=lambda: IMPORTED_AT,
+        )
+    )
+
+    assert summary.status == "failed"
+    assert summary.failed == 1
+    assert summary.failures[0].stage == "persistence"
+    assert summary.failures[0].message == "database unavailable"
+    assert summary.response_status_code() == 500
+
+
 def test_failure_status_prefers_persistence_errors() -> None:
     summary = Sp500IngestionSummary(
         failures=[

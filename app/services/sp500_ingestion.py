@@ -202,11 +202,24 @@ async def ingest_company_source(
         )
         return
 
-    import_summary = import_sp500_companies(
-        session,
-        enrich_sp500_rank_and_tier(normalized_companies),
-        imported_at=imported_at,
-    )
+    try:
+        import_summary = import_sp500_companies(
+            session,
+            enrich_sp500_rank_and_tier(normalized_companies),
+            imported_at=imported_at,
+        )
+    except Exception as error:
+        # Keep the reusable boundary automation-friendly even when persistence
+        # fails before the import service can return its row-level summary.
+        session.rollback()
+        summary.add_failure(
+            Sp500IngestionFailure(
+                source=source_name,
+                stage="persistence",
+                message=str(error),
+            )
+        )
+        return
     summary.created += import_summary.created
     summary.updated += import_summary.updated
     summary.unchanged += import_summary.unchanged
