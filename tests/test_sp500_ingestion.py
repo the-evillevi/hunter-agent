@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from sqlmodel import Session
 
-from app.config import load_config
+from app.config import PROJECT_ROOT, load_config
 from app.models.company import Company
 from app.models.config import AppConfig
 from app.models.source import Source
@@ -20,6 +20,7 @@ from app.services.company_sources import (
 from app.services.sp500_ingestion import (
     Sp500IngestionFailure,
     Sp500IngestionSummary,
+    build_company_source_registry,
     resolve_enabled_company_sources,
     run_sp500_ingestion,
 )
@@ -95,6 +96,25 @@ def test_company_source_enablement_falls_back_to_typed_config(
     )
 
     assert [adapter.identity.name for adapter in adapters] == ["ssga_spy_holdings"]
+
+
+def test_registry_resolves_relative_workbook_path_from_project_root() -> None:
+    config = load_config()
+    source_config = config.sources.ssga_spy_holdings.model_copy(
+        update={"workbook_path": "fixtures/local-spy.xlsx"}
+    )
+    config = config.model_copy(
+        update={
+            "sources": config.sources.model_copy(
+                update={"ssga_spy_holdings": source_config}
+            )
+        }
+    )
+
+    registry = build_company_source_registry(config)
+    adapter = registry.resolve_selected(["ssga_spy_holdings"])[0]
+
+    assert adapter.workbook_path == PROJECT_ROOT / "fixtures/local-spy.xlsx"
 
 
 def test_persisted_company_source_toggle_overrides_config(session: Session) -> None:

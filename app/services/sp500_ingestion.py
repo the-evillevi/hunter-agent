@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
-from app.config import load_config
+from app.config import PROJECT_ROOT, load_config
 from app.models.config import AppConfig
 from app.models.source import Source
 from app.services.company_sources import CompanySourceAdapter, CompanySourceRegistry
@@ -73,14 +74,23 @@ class Sp500IngestionSummary(BaseModel):
 def build_company_source_registry(config: AppConfig) -> CompanySourceRegistry:
     """Build the known company-source adapters from validated configuration."""
     source_config = config.sources.ssga_spy_holdings
+    workbook_path = resolve_workbook_path(source_config.workbook_path)
     registry = CompanySourceRegistry()
     registry.register(
         SSGASpyHoldingsSource(
-            workbook_path=source_config.workbook_path,
+            workbook_path=workbook_path,
             workbook_url=str(source_config.workbook_url),
         )
     )
     return registry
+
+
+def resolve_workbook_path(workbook_path: str | None) -> Path | None:
+    """Resolve relative workbook overrides from the repository root."""
+    if workbook_path is None:
+        return None
+    path = Path(workbook_path).expanduser()
+    return path if path.is_absolute() else (PROJECT_ROOT / path).resolve()
 
 
 def resolve_enabled_company_sources(
