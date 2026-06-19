@@ -260,7 +260,11 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
         "Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.",
         "Palantir Technologies",
     )
-    assert sources == [("Adzuna", 1), ("Remotive", 1)]
+    assert sources == [
+        ("Adzuna", 1),
+        ("Remotive", 1),
+        ("ssga_spy_holdings", 1),
+    ]
     assert {
         "ticker",
         "cik",
