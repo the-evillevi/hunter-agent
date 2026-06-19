@@ -133,11 +133,105 @@ with a removal date instead of being folded into the active company row.
 - Ollama scorer/tailor model settings
 - target job profiles with keywords, salary floors, location preferences, and
   exclude keywords
-- source settings for Adzuna, Remotive, and LinkedIn
+- source settings for Adzuna, Remotive, LinkedIn, and the SSGA/SPY holdings
+  workbook
 - application form defaults
 
 Avoid committing real credentials, API keys, or session cookies. Replace
 placeholder values locally when a quest needs them.
+
+## Manual S&P 500 Company Ingestion
+
+Hunter Agent can manually import S&P 500 constituents from the SSGA State
+Street SPDR S&P 500 ETF Trust holdings workbook. Scheduling is not wired yet;
+the reusable ingestion service is the boundary a future APScheduler job should
+call.
+
+Start the app, open the dashboard, and select **Run ingestion** in the **S&P 500
+company ingestion** card. For scripts or terminal use, call the same workflow
+through the JSON endpoint:
+
+```sh
+curl --fail-with-body --request POST \
+  http://127.0.0.1:8000/api/companies/sp500/ingest
+```
+
+A successful response has this shape (the numbers below are illustrative):
+
+```json
+{
+  "status": "success",
+  "sources": ["ssga_spy_holdings"],
+  "created": 490,
+  "updated": 8,
+  "unchanged": 5,
+  "removed_from_index": 1,
+  "failed": 0,
+  "failures": []
+}
+```
+
+The endpoint returns `200` for complete success, `409` when no company source
+is enabled, `502` for provider/download/normalization failures, and `500` for
+persistence failures. Enabled providers continue independently, so a response
+can have `status: "partial_failure"` and contain both imported counts and
+failure details. Any failed authoritative SSGA fetch or normalization is
+discarded before persistence so an incomplete workbook cannot incorrectly mark
+existing companies as removed.
+
+### Source enablement and workbook location
+
+The stable source name is `ssga_spy_holdings`. When a matching row exists in
+the SQLite `sources` table, its `enabled` value is authoritative. If the row is
+absent, `sources.ssga_spy_holdings.enabled` in `config.toml` is the fallback.
+Unrelated job-source rows do not affect company ingestion.
+
+By default the source downloads the official workbook:
+
+```text
+https://www.ssga.com/us/en/individual/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx
+```
+
+For offline development, set a project-relative or absolute local override:
+
+```toml
+[sources.ssga_spy_holdings]
+enabled = true
+workbook_url = "https://www.ssga.com/us/en/individual/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
+workbook_path = "./tests/fixtures/ssga_spy_holdings_representative.xlsx"
+```
+
+Omit `workbook_path` to resume downloading from `workbook_url`. Do not commit a
+machine-specific Downloads path.
+
+### Workbook and ranking semantics
+
+The workbook must contain a `holdings` sheet. Metadata rows near the top include
+the fund name, ticker symbol, and holdings-as-of date. The holdings header must
+provide `Name`, `Ticker`, and `Weight`; supported optional columns are
+`Identifier`, `SEDOL`, `Sector`, `Shares Held`, and `Local Currency`.
+
+`Weight` is the authoritative input for descending `sp500_weight_rank`.
+`sp500_tier` stores `mag7` for Magnificent Seven constituents and otherwise
+uses the `top100`, `top200`, `top300`, `top400`, or `top500` rank bucket.
+`sp500_rank_source` and `sp500_rank_status` identify weight-derived rankings so
+future enrichment cannot silently masquerade as authoritative rank data.
+
+The workbook's `Identifier` is stored as provider metadata and is not assumed
+to be a CIK. Wikipedia is a later enrichment source, while Slickcharts is a
+possible third provider; neither replaces SSGA/SPY as the first source of truth.
+
+### Verify an import
+
+Run the focused tests and inspect the active and removed constituent counts:
+
+```sh
+uv run pytest tests/test_sp500_ingestion.py tests/test_sp500_company_import.py -q
+sqlite3 app/db/hunter-agent.db \
+  "SELECT COUNT(*) FROM companies WHERE is_sp500 = 1;"
+sqlite3 app/db/hunter-agent.db \
+  "SELECT COUNT(*) FROM removed_sp500_companies;"
+```
 
 ## Target Vision
 
