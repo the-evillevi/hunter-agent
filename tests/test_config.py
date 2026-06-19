@@ -116,6 +116,25 @@ def test_enabled_linkedin_requires_session_cookie() -> None:
         AppConfig.model_validate(raw_config)
 
 
+def test_ssga_source_uses_remote_workbook_when_local_path_is_omitted() -> None:
+    config = AppConfig.model_validate(load_raw_config())
+
+    assert config.sources.ssga_spy_holdings.enabled is True
+    assert config.sources.ssga_spy_holdings.workbook_path is None
+    assert str(config.sources.ssga_spy_holdings.workbook_url).endswith(
+        "holdings-daily-us-en-spy.xlsx"
+    )
+
+
+def test_ssga_source_treats_blank_local_path_as_remote_download() -> None:
+    raw_config = deepcopy(load_raw_config())
+    raw_config["sources"]["ssga_spy_holdings"]["workbook_path"] = "  "
+
+    config = AppConfig.model_validate(raw_config)
+
+    assert config.sources.ssga_spy_holdings.workbook_path is None
+
+
 @pytest.mark.parametrize("field", ["keywords", "exclude_keywords"])
 def test_profile_keywords_reject_case_insensitive_duplicates(field: str) -> None:
     raw_config = deepcopy(load_raw_config())

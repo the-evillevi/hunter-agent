@@ -80,6 +80,7 @@ INSERT INTO locations (name) VALUES ('Querétaro, QRO');
 -- Sources
 INSERT INTO sources (name, enabled) VALUES ('Adzuna', 1);
 INSERT INTO sources (name, enabled) VALUES ('Remotive', 1);
+INSERT INTO sources (name, enabled) VALUES ('ssga_spy_holdings', 1);
 
 -- Keywords
 INSERT INTO keywords (name) VALUES ('Python');
