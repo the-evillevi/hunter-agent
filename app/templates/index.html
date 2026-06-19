@@ -46,6 +46,38 @@
         class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
+          <h2 class="card-title">S&amp;P 500 company ingestion</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            Import enabled company sources into the local database.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-post="/companies/sp500/ingest"
+          hx-target="#sp500-ingestion-result"
+          hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          hx-indicator="#sp500-ingestion-progress"
+        >
+          Run ingestion
+        </button>
+      </div>
+
+      <p id="sp500-ingestion-progress" class="htmx-indicator mt-4 text-sm">
+        Importing S&amp;P 500 companies…
+      </p>
+      <div id="sp500-ingestion-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
           <h2 class="card-title">Job sources</h2>
           <p class="text-base-content/60 mt-1 text-sm">
             Runtime source enablement is stored in SQLite.
