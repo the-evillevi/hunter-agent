@@ -214,12 +214,14 @@ provide `Name`, `Ticker`, and `Weight`; supported optional columns are
 `Weight` is the authoritative input for descending `sp500_weight_rank`.
 `sp500_tier` stores `mag7` for Magnificent Seven constituents and otherwise
 uses the `top100`, `top200`, `top300`, `top400`, or `top500` rank bucket.
+The workbook can contain more than 500 securities because some index companies
+have multiple share classes; a valid rank above 500 has no top-N tier.
 `sp500_rank_source` and `sp500_rank_status` identify weight-derived rankings so
 future enrichment cannot silently masquerade as authoritative rank data.
 
-The workbook's `Identifier` is stored as provider metadata and is not assumed
-to be a CIK. Wikipedia is a later enrichment source, while Slickcharts is a
-possible third provider; neither replaces SSGA/SPY as the first source of truth.
+The workbook's `Identifier` is stored in `sp500_identifier` and is not assumed to
+be a CIK. Wikipedia is a later enrichment source, while Slickcharts is a possible
+third provider; neither replaces SSGA/SPY as the first source of truth.
 
 ### Verify an import
 
