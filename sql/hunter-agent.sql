@@ -40,7 +40,7 @@ CREATE TABLE companies (
   is_sp500 BOOLEAN NOT NULL DEFAULT 0 CHECK (is_sp500 IN (0, 1)),
   sp500_weight_rank INTEGER CHECK (
     sp500_weight_rank IS NULL
-    OR sp500_weight_rank BETWEEN 1 AND 500
+    OR sp500_weight_rank >= 1
   ),
   sp500_tier TEXT CHECK (
     sp500_tier IS NULL

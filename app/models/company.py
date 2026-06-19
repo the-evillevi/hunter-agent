@@ -17,7 +17,7 @@ class Company(SQLModel, table=True):
             name="ck_companies_sp500_tier",
         ),
         CheckConstraint(
-            "sp500_weight_rank IS NULL OR sp500_weight_rank BETWEEN 1 AND 500",
+            "sp500_weight_rank IS NULL OR sp500_weight_rank >= 1",
             name="ck_companies_sp500_weight_rank",
         ),
         CheckConstraint(

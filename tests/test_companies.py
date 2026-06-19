@@ -88,6 +88,24 @@ def test_sp500_tier_is_constrained(session: Session) -> None:
         session.commit()
 
 
+def test_sp500_weight_rank_accepts_multiple_share_classes(session: Session) -> None:
+    """Real S&P holdings can contain more than 500 ranked securities."""
+    company = Company(name="Rank 503 Corp", ticker="R503", sp500_weight_rank=503)
+
+    session.add(company)
+    session.commit()
+    session.refresh(company)
+
+    assert company.sp500_weight_rank == 503
+
+
+def test_sp500_weight_rank_rejects_non_positive_values(session: Session) -> None:
+    session.add(Company(name="Invalid Rank Corp", sp500_weight_rank=0))
+
+    with pytest.raises(IntegrityError):
+        session.commit()
+
+
 def test_sp500_rank_status_is_constrained(session: Session) -> None:
     """Only the agreed S&P rank provenance statuses are accepted."""
     session.add(Company(name="Ranked Corp", ticker="RANK", sp500_rank_status="guessed"))
