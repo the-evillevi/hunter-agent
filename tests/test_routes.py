@@ -15,6 +15,8 @@ def test_home_route_renders_jobs_page(client, create_application) -> None:
 
     assert response.status_code == 200
     assert "Tracked jobs" in response.text
+    assert "S&amp;P 500 company ingestion" in response.text
+    assert 'hx-post="/companies/sp500/ingest"' in response.text
     assert "Job sources" in response.text
     assert "Adzuna" in response.text
     assert "Applied" in response.text

@@ -1,0 +1,31 @@
+<div
+  class="alert {% if summary.status == 'success' %}alert-success{% else %}alert-error{% endif %} mt-4"
+  role="status"
+>
+  <div>
+    <p class="font-semibold">
+      {% if summary.status == "success" %}
+        S&amp;P 500 ingestion completed
+      {% elif summary.status == "partial_failure" %}
+        S&amp;P 500 ingestion completed with failures
+      {% else %}
+        S&amp;P 500 ingestion failed
+      {% endif %}
+    </p>
+    <p class="mt-1 text-sm">
+      Created {{ summary.created }}, updated {{ summary.updated }}, unchanged
+      {{ summary.unchanged }}, removed {{ summary.removed_from_index }}, failed
+      {{ summary.failed }}.
+    </p>
+
+    {% if summary.failures %}
+      <ul class="mt-2 list-disc pl-5 text-sm">
+        {% for failure in summary.failures %}
+          <li>
+            {{ failure.source }} ({{ failure.stage }}): {{ failure.message }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>

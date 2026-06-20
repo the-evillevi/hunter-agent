@@ -137,6 +137,10 @@ class CompanySourceRegistry:
     def register(self, adapter: CompanySourceAdapter) -> None:
         self._adapters[adapter.identity.name] = adapter
 
+    def source_names(self) -> list[str]:
+        """Return registered adapter identities in registration order."""
+        return list(self._adapters)
+
     def resolve_selected(
         self,
         source_names: Iterable[str],

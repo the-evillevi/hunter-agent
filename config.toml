@@ -110,6 +110,13 @@ enabled = false # start false — enable once stable
 # Set to true only after Adzuna + Remotive are working
 session_cookie = "" # li_at cookie value from browser
 
+[sources.ssga_spy_holdings]
+enabled = true
+workbook_url = "https://www.ssga.com/us/en/individual/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
+# Set this to a downloaded workbook for local/offline runs. When omitted, the
+# ingestion service downloads workbook_url.
+# workbook_path = "./tests/fixtures/ssga_spy_holdings_representative.xlsx"
+
 
 # ============================================================
 # APPLICATION ENGINE

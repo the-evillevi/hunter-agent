@@ -27,6 +27,7 @@ REQUIRED_COLUMNS = ("Name", "Ticker", "Weight")
 OPTIONAL_COLUMNS = ("Identifier", "SEDOL", "Sector", "Shares Held", "Local Currency")
 NON_COMPANY_MARKERS = (
     "CASH",
+    "CONTRA",
     "CURRENCY",
     "DERIVATIVE",
     "FUTURE",

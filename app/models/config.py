@@ -178,12 +178,32 @@ class LinkedInSourceConfig(StrictConfigModel):
         return self
 
 
+class SSGASpyHoldingsSourceConfig(StrictConfigModel):
+    """SSGA/SPY workbook settings for S&P 500 company ingestion."""
+
+    enabled: bool
+    workbook_url: AnyHttpUrl
+    workbook_path: str | None = None
+
+    @field_validator("workbook_path")
+    @classmethod
+    def blank_workbook_path_uses_remote_url(
+        cls, workbook_path: str | None
+    ) -> str | None:
+        """Treat an omitted or blank path as a request to download the workbook."""
+        if workbook_path is None:
+            return None
+        normalized_path = workbook_path.strip()
+        return normalized_path or None
+
+
 class SourcesConfig(StrictConfigModel):
-    """All job source settings grouped together."""
+    """Job and company source settings grouped together."""
 
     adzuna: AdzunaSourceConfig
     remotive: RemotiveSourceConfig
     linkedin: LinkedInSourceConfig
+    ssga_spy_holdings: SSGASpyHoldingsSourceConfig
 
 
 class FormDefaultsConfig(StrictConfigModel):

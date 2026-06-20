@@ -18,6 +18,7 @@ from app.services.ssga_spy_holdings import (
     SSGA_SPY_HOLDINGS_URL,
     SSGASpyHoldingsSource,
     SSGAWorkbookParseError,
+    skip_reason,
 )
 
 
@@ -61,6 +62,17 @@ def test_fetch_records_skipped_rows_without_crashing() -> None:
         (10, "missing required Weight"),
         (11, "non-company holding"),
     ]
+
+
+def test_contra_corporate_action_position_is_not_a_company() -> None:
+    row = {
+        "Name": "CONTRA HOLOGIC INCORPO",
+        "Ticker": "2602335D",
+        "Weight": 0.000003,
+        "Sector": "-",
+    }
+
+    assert skip_reason(row) == "non-company holding"
 
 
 def test_normalize_preserves_ticker_punctuation_and_optional_fields() -> None:
