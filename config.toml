@@ -8,7 +8,7 @@ version = "0.1.0"
 db_path = "./app/db/hunter-agent.db"
 cv_master = "./cv/master.docx"
 cv_output = "./cv/tailored/"
-log_level = "INFO"               # DEBUG | INFO | WARNING
+log_level = "INFO"                   # DEBUG | INFO | WARNING
 
 
 # ============================================================
@@ -112,7 +112,7 @@ session_cookie = "" # li_at cookie value from browser
 
 [sources.ssga_spy_holdings]
 enabled = true
-workbook_url = "https://www.ssga.com/us/en/individual/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
+workbook_url = "https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-spy.xlsx"
 # Set this to a downloaded workbook for local/offline runs. When omitted, the
 # ingestion service downloads workbook_url.
 # workbook_path = "./tests/fixtures/ssga_spy_holdings_representative.xlsx"
