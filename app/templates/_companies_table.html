@@ -1,0 +1,107 @@
+{% if company_page.is_out_of_range %}
+  <div class="border-base-300 rounded-box border border-dashed p-8 text-center">
+    <h3 class="font-semibold">That page is out of range</h3>
+    <p class="text-base-content/60 mt-1 text-sm">
+      There are {{ company_page.total_pages }} pages for these filters.
+    </p>
+    {% if previous_url %}
+      <a
+        class="btn btn-outline btn-sm mt-4"
+        href="{{ previous_url }}"
+        hx-get="{{ previous_partial_url }}"
+        hx-target="#companies-table"
+        hx-swap="innerHTML"
+        >Go to last page</a
+      >
+    {% endif %}
+  </div>
+{% elif not company_page.companies %}
+  <div class="border-base-300 rounded-box border border-dashed p-8 text-center">
+    <h3 class="font-semibold">No companies found</h3>
+    <p class="text-base-content/60 mt-1 text-sm">
+      Try clearing the search or choosing broader filters.
+    </p>
+  </div>
+{% else %}
+  <div class="overflow-x-auto">
+    <table class="table-zebra table">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Ticker</th>
+          <th>Name</th>
+          <th>Sector</th>
+          <th>Tier</th>
+          <th class="text-right">Weight</th>
+          <th>Membership</th>
+          <th>Holdings as of</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for company in company_page.companies %}
+          <tr>
+            <td>{{ company.sp500_weight_rank or "—" }}</td>
+            <td class="font-mono font-semibold">{{ company.ticker or "—" }}</td>
+            <td>{{ company.name }}</td>
+            <td>{{ company.sector or "—" }}</td>
+            <td>{{ company.sp500_tier or "—" }}</td>
+            <td class="text-right">
+              {% if company.sp500_weight is not none %}
+                {{ "%.3f"|format(company.sp500_weight) }}%
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              {% if company.is_sp500 %}
+                <span class="badge badge-success badge-sm">Current</span>
+              {% else %}
+                <span class="badge badge-ghost badge-sm">Historical</span>
+              {% endif %}
+            </td>
+            <td>{{ company.sp500_holdings_as_of or "—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div
+    class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+  >
+    <p class="text-base-content/60 text-sm">
+      Page {{ company_page.page }} of {{ company_page.total_pages }} ·
+      {{ company_page.total }} companies
+    </p>
+    <div class="join">
+      {% if previous_url %}
+        <a
+          class="btn join-item btn-sm"
+          href="{{ previous_url }}"
+          hx-get="{{ previous_partial_url }}"
+          hx-target="#companies-table"
+          hx-swap="innerHTML"
+          >Previous</a
+        >
+      {% else %}
+        <button class="btn join-item btn-sm" type="button" disabled>
+          Previous
+        </button>
+      {% endif %}
+      {% if next_url %}
+        <a
+          class="btn join-item btn-sm"
+          href="{{ next_url }}"
+          hx-get="{{ next_partial_url }}"
+          hx-target="#companies-table"
+          hx-swap="innerHTML"
+          >Next</a
+        >
+      {% else %}
+        <button class="btn join-item btn-sm" type="button" disabled>
+          Next
+        </button>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}

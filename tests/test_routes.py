@@ -22,6 +22,7 @@ def test_home_route_renders_jobs_page(client, create_application) -> None:
     assert "Applied" in response.text
     assert "Avg score" in response.text
     assert "pending:" in response.text
+    assert 'href="/companies"' in response.text
 
 
 def test_jobs_partial_renders_jobs_table(client, create_job) -> None:
