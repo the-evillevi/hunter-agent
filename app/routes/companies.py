@@ -1,11 +1,15 @@
-"""Manual S&P 500 company-ingestion routes."""
+"""Company browsing and manual S&P 500 ingestion routes."""
 
-from fastapi import APIRouter, Depends, Request
+from typing import Annotated, Literal
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import Session
 
 from app.db.database import get_session
+from app.services.companies import CompanyPage, list_companies
 from app.services.sp500_ingestion import (
     Sp500IngestionSummary,
     run_sp500_ingestion,
@@ -14,6 +18,144 @@ from app.services.sp500_ingestion import (
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
+
+CompanyTier = Literal["all", "mag7", "top100", "top200", "top300", "top400", "top500"]
+CompanyMembership = Literal["current", "all"]
+
+
+def _companies_context(
+    *,
+    company_page: CompanyPage,
+    q: str | None,
+    membership: CompanyMembership,
+    tier: CompanyTier,
+) -> dict:
+    """Build shared template state, including filter-preserving page URLs."""
+    query = q.strip() if q else ""
+
+    def page_url(page: int, *, partial: bool) -> str:
+        parameters = {
+            "membership": membership,
+            "tier": tier,
+            "page": page,
+            "page_size": company_page.page_size,
+        }
+        if query:
+            parameters["q"] = query
+        path = "/companies/partials/table" if partial else "/companies"
+        return f"{path}?{urlencode(parameters)}"
+
+    return {
+        "company_page": company_page,
+        "q": query,
+        "membership": membership,
+        "tier": tier,
+        "previous_url": (
+            page_url(company_page.previous_page, partial=False)
+            if company_page.previous_page is not None
+            else None
+        ),
+        "previous_partial_url": (
+            page_url(company_page.previous_page, partial=True)
+            if company_page.previous_page is not None
+            else None
+        ),
+        "next_url": (
+            page_url(company_page.next_page, partial=False)
+            if company_page.next_page is not None
+            else None
+        ),
+        "next_partial_url": (
+            page_url(company_page.next_page, partial=True)
+            if company_page.next_page is not None
+            else None
+        ),
+    }
+
+
+def _query_companies(
+    session: Session,
+    *,
+    q: str | None,
+    membership: CompanyMembership,
+    tier: CompanyTier,
+    page: int,
+    page_size: int,
+) -> CompanyPage:
+    return list_companies(
+        session,
+        q=q,
+        membership=membership,
+        tier=None if tier == "all" else tier,
+        page=page,
+        page_size=page_size,
+    )
+
+
+@router.get("/companies", response_class=HTMLResponse)
+def companies_page(
+    request: Request,
+    q: str | None = None,
+    membership: CompanyMembership = "current",
+    tier: CompanyTier = "all",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render the complete, filterable companies page."""
+    company_page = _query_companies(
+        session,
+        q=q,
+        membership=membership,
+        tier=tier,
+        page=page,
+        page_size=page_size,
+    )
+    return templates.TemplateResponse(
+        request,
+        "companies.html",
+        _companies_context(
+            company_page=company_page,
+            q=q,
+            membership=membership,
+            tier=tier,
+        ),
+    )
+
+
+@router.get(
+    "/companies/partials/table",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+def companies_table_partial(
+    request: Request,
+    q: str | None = None,
+    membership: CompanyMembership = "current",
+    tier: CompanyTier = "all",
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 50,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Render only the replaceable company table and pagination fragment."""
+    company_page = _query_companies(
+        session,
+        q=q,
+        membership=membership,
+        tier=tier,
+        page=page,
+        page_size=page_size,
+    )
+    return templates.TemplateResponse(
+        request,
+        "_companies_table.html",
+        _companies_context(
+            company_page=company_page,
+            q=q,
+            membership=membership,
+            tier=tier,
+        ),
+    )
 
 
 @router.post(

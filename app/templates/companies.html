@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">S&amp;P 500 company ingestion</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            Import enabled company sources into the local database.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-post="/companies/sp500/ingest"
+          hx-target="#sp500-ingestion-result"
+          hx-swap="innerHTML"
+          hx-disabled-elt="this"
+          hx-indicator="#sp500-ingestion-progress"
+        >
+          Run ingestion
+        </button>
+      </div>
+
+      <p id="sp500-ingestion-progress" class="htmx-indicator mt-4 text-sm">
+        Importing S&amp;P 500 companies…
+      </p>
+      <div id="sp500-ingestion-result" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div>
+        <h2 class="card-title text-2xl">Companies</h2>
+        <p class="text-base-content/60 mt-1 text-sm">
+          Browse current and historical S&amp;P 500 company records.
+        </p>
+      </div>
+
+      <form
+        class="mt-4 grid gap-3 md:grid-cols-[minmax(12rem,1fr)_auto_auto_auto_auto] md:items-end"
+        action="/companies"
+        method="get"
+        hx-get="/companies/partials/table"
+        hx-target="#companies-table"
+        hx-swap="innerHTML"
+      >
+        <label class="form-control">
+          <span class="label-text mb-1 text-sm">Name or ticker</span>
+          <input
+            class="input input-bordered w-full"
+            type="search"
+            name="q"
+            value="{{ q }}"
+            placeholder="Apple or AAPL"
+          />
+        </label>
+
+        <label class="form-control">
+          <span class="label-text mb-1 text-sm">Membership</span>
+          <select class="select select-bordered" name="membership">
+            <option
+              value="current"
+              {% if membership == "current" %}selected{% endif %}
+            >
+              Current
+            </option>
+            <option value="all" {% if membership == "all" %}selected{% endif %}>
+              All
+            </option>
+          </select>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text mb-1 text-sm">Tier</span>
+          <select class="select select-bordered" name="tier">
+            {% for value, label in [("all", "All tiers"), ("mag7", "Mag 7"), ("top100", "Top 100"), ("top200", "Top 200"), ("top300", "Top 300"), ("top400", "Top 400"), ("top500", "Top 500")] %}
+              <option
+                value="{{ value }}"
+                {% if tier == value %}selected{% endif %}
+              >
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text mb-1 text-sm">Rows</span>
+          <input
+            class="input input-bordered w-24"
+            type="number"
+            name="page_size"
+            value="{{ company_page.page_size }}"
+            min="1"
+            max="100"
+          />
+        </label>
+
+        <input type="hidden" name="page" value="1" />
+        <button class="btn btn-primary" type="submit">Apply</button>
+      </form>
+
+      <div id="companies-table" class="mt-6" aria-live="polite">
+        {% include "_companies_table.html" %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
