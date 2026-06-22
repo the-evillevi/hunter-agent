@@ -13,15 +13,19 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/sources", response_class=HTMLResponse)
-def sources_partial(
+@router.get(
+    "/sources/partials/list",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+def sources_list_partial(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    """Render only the source enablement fragment."""
+    """Render only the source enablement list for HTMX retrieval."""
     return templates.TemplateResponse(
         request,
-        "sources.html",
+        "_sources_list.html",
         {"sources": list_sources(session)},
     )
 
@@ -41,6 +45,6 @@ def toggle_source(
 
     return templates.TemplateResponse(
         request,
-        "sources.html",
+        "_sources_list.html",
         {"sources": list_sources(session)},
     )

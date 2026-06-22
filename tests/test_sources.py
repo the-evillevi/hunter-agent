@@ -92,7 +92,7 @@ def test_sources_partial_renders_source_status(
     source_session.add(Source(name="Adzuna", enabled=True))
     source_session.commit()
 
-    response = source_client.get("/sources")
+    response = source_client.get("/sources/partials/list")
 
     assert response.status_code == 200
     assert "Adzuna" in response.text

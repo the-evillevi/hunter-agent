@@ -36,12 +36,16 @@ def home(request: Request, session: Session = Depends(get_session)) -> HTMLRespo
     )
 
 
-@router.get("/jobs", response_class=HTMLResponse)
-def jobs_partial(
+@router.get(
+    "/jobs/partials/list",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+def jobs_list_partial(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    """Render only the jobs list fragment.
+    """Render only the jobs list fragment for HTMX retrieval.
 
     HTMX calls this route from the Refresh button in the template. Returning a
     partial keeps the browser update small and easy to understand.
@@ -49,6 +53,6 @@ def jobs_partial(
     jobs = list_jobs(session)
     return templates.TemplateResponse(
         request,
-        "jobs.html",
+        "_jobs_list.html",
         {"jobs": jobs},
     )

@@ -30,6 +30,15 @@ application, `app/routes/` owning HTTP endpoints, `app/services/` holding
 business logic, `app/models/` defining SQLModel/Pydantic models, and `app/db/`
 containing database helpers plus the local SQLite database.
 
+### HTML and HTMX route conventions
+
+Full HTML pages use the resource path, such as `/companies`. Dedicated fragment
+reads use `/{resource}/partials/{fragment}`, such as
+`/companies/partials/table` or `/jobs/partials/list`, and are excluded from
+OpenAPI because they are internal UI surfaces. Mutations keep meaningful
+resource or action URLs even when their response is an HTML fragment; returning
+HTML alone does not put a route under `/partials`.
+
 ## Quickstart
 
 Install Python dependencies:

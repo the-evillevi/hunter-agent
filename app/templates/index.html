@@ -55,7 +55,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          hx-get="/sources"
+          hx-get="/sources/partials/list"
           hx-target="#sources-panel"
           hx-swap="innerHTML"
         >
@@ -63,7 +63,7 @@
         </button>
       </div>
 
-      <div id="sources-panel">{% include "sources.html" %}</div>
+      <div id="sources-panel">{% include "_sources_list.html" %}</div>
     </div>
   </section>
 
@@ -82,7 +82,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          hx-get="/jobs"
+          hx-get="/jobs/partials/list"
           hx-target="#jobs-list"
           hx-swap="innerHTML"
         >
@@ -90,7 +90,7 @@
         </button>
       </div>
 
-      <div id="jobs-list">{% include "jobs.html" %}</div>
+      <div id="jobs-list">{% include "_jobs_list.html" %}</div>
     </div>
   </section>
 
@@ -106,7 +106,7 @@
         <button
           type="button"
           class="btn btn-primary"
-          hx-get="/applications"
+          hx-get="/applications/partials/list"
           hx-target="#applications-list"
           hx-swap="innerHTML"
         >
@@ -114,7 +114,7 @@
         </button>
       </div>
 
-      <div id="applications-list">{% include "applications.html" %}</div>
+      <div id="applications-list">{% include "_applications_list.html" %}</div>
     </div>
   </section>
 {% endblock %}
