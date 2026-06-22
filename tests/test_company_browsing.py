@@ -201,6 +201,7 @@ def test_internal_partial_reads_are_excluded_from_openapi(client) -> None:
     paths = client.get("/openapi.json").json()["paths"]
 
     assert "/companies" in paths
+    assert "/jobs" in paths
     partial_paths = {
         "/companies/partials/table",
         "/jobs/partials/list",
