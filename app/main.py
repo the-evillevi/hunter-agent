@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import applications, companies, health, jobs, sources
+from app.routes import applications, companies, dashboard, health, jobs, sources
 
 app = FastAPI(title="hunter-agent")
 
@@ -10,6 +10,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Routers keep `main.py` focused on wiring. Feature code lives in `app/routes/`.
 app.include_router(health.router)
+app.include_router(dashboard.router)
 app.include_router(applications.router)
 app.include_router(jobs.router)
 app.include_router(sources.router)

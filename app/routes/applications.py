@@ -17,16 +17,20 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/applications", response_class=HTMLResponse)
-def applications_partial(
+@router.get(
+    "/applications/partials/list",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+def applications_list_partial(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
-    """Render only the applications list fragment."""
+    """Render only the applications list fragment for HTMX retrieval."""
     applications = list_applications(session)
     return templates.TemplateResponse(
         request,
-        "applications.html",
+        "_applications_list.html",
         {
             "applications": applications,
             "application_statuses": APPLICATION_STATUS_ORDER,

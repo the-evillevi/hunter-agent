@@ -197,8 +197,15 @@ def test_companies_routes_reject_invalid_query_values(client, parameters) -> Non
     assert response.status_code == 422
 
 
-def test_companies_fragment_is_excluded_from_openapi(client) -> None:
+def test_internal_partial_reads_are_excluded_from_openapi(client) -> None:
     paths = client.get("/openapi.json").json()["paths"]
 
     assert "/companies" in paths
-    assert "/companies/partials/table" not in paths
+    assert "/jobs" in paths
+    partial_paths = {
+        "/companies/partials/table",
+        "/jobs/partials/list",
+        "/sources/partials/list",
+        "/applications/partials/list",
+    }
+    assert partial_paths.isdisjoint(paths)

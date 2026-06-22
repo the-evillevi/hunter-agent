@@ -1,46 +1,57 @@
-{% if jobs %}
-  <div class="overflow-x-auto">
-    <table class="table-zebra table">
-      <thead>
-        <tr>
-          <th>Role</th>
-          <th>Company</th>
-          <th>Location</th>
-          <th>Source</th>
-          <th>Score</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for job in jobs %}
-          <tr>
-            <td class="font-semibold">{{ job.title }}</td>
-            <td>{{ job.company }}</td>
-            <td>{{ job.location }}</td>
-            <td>{{ job.source }}</td>
-            <td>
-              {% if job.score is not none %}
-                <span class="badge badge-outline">{{ job.score }}/100</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if job.url %}
-                <a
-                  class="btn btn-ghost btn-sm"
-                  href="{{ job.url }}"
-                  target="_blank"
-                  rel="noreferrer"
-                  >Open</a
-                >
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% else %}
-  <p class="text-base-content/60 text-sm">
-    No jobs found yet. TODO: run seed data or implement the first scraper.
-  </p>
-{% endif %}
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Job sources</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            Runtime source enablement is stored in SQLite.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-get="/sources/partials/list"
+          hx-target="#sources-panel"
+          hx-swap="innerHTML"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div id="sources-panel">{% include "_sources_list.html" %}</div>
+    </div>
+  </section>
+
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Tracked jobs</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            These rows come from SQLite. The scraper will add more later.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-get="/jobs/partials/list"
+          hx-target="#jobs-list"
+          hx-swap="innerHTML"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div id="jobs-list">{% include "_jobs_list.html" %}</div>
+    </div>
+  </section>
+{% endblock %}

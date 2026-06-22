@@ -1,0 +1,46 @@
+{% if jobs %}
+  <div class="overflow-x-auto">
+    <table class="table-zebra table">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Company</th>
+          <th>Location</th>
+          <th>Source</th>
+          <th>Score</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+          <tr>
+            <td class="font-semibold">{{ job.title }}</td>
+            <td>{{ job.company }}</td>
+            <td>{{ job.location }}</td>
+            <td>{{ job.source }}</td>
+            <td>
+              {% if job.score is not none %}
+                <span class="badge badge-outline">{{ job.score }}/100</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if job.url %}
+                <a
+                  class="btn btn-ghost btn-sm"
+                  href="{{ job.url }}"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Open</a
+                >
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-base-content/60 text-sm">
+    No jobs found yet. TODO: run seed data or implement the first scraper.
+  </p>
+{% endif %}

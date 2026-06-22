@@ -46,67 +46,13 @@
         class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <h2 class="card-title">Job sources</h2>
-          <p class="text-base-content/60 mt-1 text-sm">
-            Runtime source enablement is stored in SQLite.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-primary"
-          hx-get="/sources"
-          hx-target="#sources-panel"
-          hx-swap="innerHTML"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div id="sources-panel">{% include "sources.html" %}</div>
-    </div>
-  </section>
-
-  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
-    <div class="card-body">
-      <div
-        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
-          <h2 class="card-title">Tracked jobs</h2>
-          <p class="text-base-content/60 mt-1 text-sm">
-            These rows come from SQLite. The scraper will add more later.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-primary"
-          hx-get="/jobs"
-          hx-target="#jobs-list"
-          hx-swap="innerHTML"
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div id="jobs-list">{% include "jobs.html" %}</div>
-    </div>
-  </section>
-
-  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
-    <div class="card-body">
-      <div
-        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-      >
-        <div>
           <h2 class="card-title">Tracked applications</h2>
         </div>
 
         <button
           type="button"
           class="btn btn-primary"
-          hx-get="/applications"
+          hx-get="/applications/partials/list"
           hx-target="#applications-list"
           hx-swap="innerHTML"
         >
@@ -114,7 +60,7 @@
         </button>
       </div>
 
-      <div id="applications-list">{% include "applications.html" %}</div>
+      <div id="applications-list">{% include "_applications_list.html" %}</div>
     </div>
   </section>
 {% endblock %}

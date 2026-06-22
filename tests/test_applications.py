@@ -105,7 +105,7 @@ def test_applications_partial_renders_application_card(
     """Expose the partial route and render values instead of an empty card."""
     create_application()
 
-    response = client.get("/applications")
+    response = client.get("/applications/partials/list")
 
     assert response.status_code == 200
     assert "AI/ML Engineer" in response.text
@@ -173,7 +173,7 @@ def test_applications_partial_exposes_all_status_controls(
     """Status controls are available immediately in the requested order."""
     create_application(status=ApplicationStatus.pending)
 
-    response = client.get("/applications")
+    response = client.get("/applications/partials/list")
 
     assert response.status_code == 200
     positions = [
@@ -204,7 +204,7 @@ def test_applications_partial_renders_empty_state(monkeypatch, client) -> None:
         "list_applications",
         empty_applications,
     )
-    response = client.get("/applications")
+    response = client.get("/applications/partials/list")
 
     assert response.status_code == 200
     assert "No applications found yet" in response.text
