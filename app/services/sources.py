@@ -70,6 +70,11 @@ class JobSourceRunContext:
     location: str | None = None
     profile_id: int | None = None
     credentials: Mapping[str, str] = field(default_factory=dict)
+    exclude_keywords: tuple[str, ...] = ()
+    location_types: tuple[str, ...] = ()
+    salary_min: int | None = None
+    match_threshold: int | None = None
+    source_query: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

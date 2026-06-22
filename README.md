@@ -140,14 +140,24 @@ with a removal date instead of being folded into the active company row.
 - app metadata and paths, including `app/db/hunter-agent.db`
 - scheduler settings
 - Ollama scorer/tailor model settings
-- target job profiles with keywords, salary floors, location preferences, and
-  exclude keywords
 - source settings for Adzuna, Remotive, LinkedIn, and the SSGA/SPY holdings
   workbook
 - application form defaults
 
 Avoid committing real credentials, API keys, or session cookies. Replace
 placeholder values locally when a quest needs them.
+
+## Job Profiles
+
+Job profiles are stored in SQLite and managed from `/profiles`. Each profile
+owns its role, active state, salary floor, match threshold, location types,
+included keywords, excluded keywords, and versioned source queries. Provider
+credentials and provider-wide limits remain in `config.toml`.
+
+Remotive profile queries support a constrained category, an optional company
+selected from the companies table, free-form search text, and a result limit
+from 1 through 10. Future adapters can register their own validated query JSON
+schema without adding provider-specific columns to the core profile table.
 
 ## Manual S&P 500 Company Ingestion
 

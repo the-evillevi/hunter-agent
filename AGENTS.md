@@ -4,7 +4,7 @@
 
 `app/` contains the FastAPI application. `app/main.py` wires the app together, `app/routes/` owns HTTP endpoints, `app/services/` holds business logic, `app/db/` contains SQLModel session helpers and the local database, and `app/models/` contains SQLModel and Pydantic models. Jinja templates live in `app/templates/`; Tailwind input/output files live in `app/static/`.
 
-`sql/` contains database scripts. `sql/hunter-agent.sql` is the schema and `sql/seed.sql` is sample data. `config.toml` is the main configuration file for paths, scheduler settings, job profiles, sources, and application defaults.
+`sql/` contains database scripts. `sql/hunter-agent.sql` is the schema and `sql/seed.sql` is sample data. `config.toml` is the main configuration file for paths, scheduler settings, sources, and application defaults. Job profiles are database-owned and managed at `/profiles`.
 
 Tests live in `tests/` and should mirror the app structure, for example `tests/test_jobs.py`.
 

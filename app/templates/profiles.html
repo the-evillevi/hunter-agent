@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title text-2xl">Job profiles</h2>
+      <p class="text-base-content/60 text-sm">
+        Persist target roles, matching criteria, and provider searches in
+        SQLite.
+      </p>
+
+      <form
+        class="border-base-300 mt-4 grid gap-3 rounded-lg border p-4 md:grid-cols-2"
+        hx-post="/profiles"
+        hx-target="#profiles-list"
+        hx-swap="innerHTML"
+      >
+        <h3 class="font-semibold md:col-span-2">Create profile</h3>
+        <label class="form-control">
+          <span class="label-text mb-1">Role name</span>
+          <input class="input input-bordered" name="role_name" required />
+        </label>
+        <label class="form-control">
+          <span class="label-text mb-1">Salary minimum</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            name="salary_min"
+            min="0"
+            value="0"
+            required
+          />
+        </label>
+        <label class="form-control">
+          <span class="label-text mb-1">Match threshold</span>
+          <input
+            class="input input-bordered"
+            type="number"
+            name="match_threshold"
+            min="1"
+            max="100"
+            value="80"
+            required
+          />
+        </label>
+        <label class="flex items-center gap-2 self-end pb-3">
+          <input
+            class="checkbox"
+            type="checkbox"
+            name="active"
+            value="true"
+            checked
+          />
+          Active
+        </label>
+        <fieldset class="md:col-span-2">
+          <legend class="label-text mb-1">Location types</legend>
+          <div class="flex flex-wrap gap-4">
+            {% for value in ["remote", "hybrid", "onsite"] %}
+              <label class="flex items-center gap-2">
+                <input
+                  class="checkbox checkbox-sm"
+                  type="checkbox"
+                  name="location_type"
+                  value="{{ value }}"
+                />
+                {{ value|title }}
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <label class="form-control md:col-span-2">
+          <span class="label-text mb-1"
+            >Keywords (comma or line separated)</span
+          >
+          <textarea
+            class="textarea textarea-bordered"
+            name="keywords"
+            required
+          ></textarea>
+        </label>
+        <label class="form-control md:col-span-2">
+          <span class="label-text mb-1">Excluded keywords</span>
+          <textarea
+            class="textarea textarea-bordered"
+            name="exclude_keywords"
+          ></textarea>
+        </label>
+        <button
+          class="btn btn-primary md:col-span-2 md:justify-self-start"
+          type="submit"
+        >
+          Create profile
+        </button>
+      </form>
+
+      <div id="profiles-list" class="mt-6" aria-live="polite">
+        {% include "_profiles_list.html" %}
+      </div>
+    </div>
+  </section>
+{% endblock %}
