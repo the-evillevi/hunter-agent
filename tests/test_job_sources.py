@@ -305,7 +305,8 @@ def test_remotive_adapter_normalizes_representative_job() -> None:
     assert job.company == "HNTR Labs"
     assert job.location == "Worldwide"
     assert job.external_id == "123"
-    assert job.scraped_at == datetime(2026, 6, 23, 10, 23, 26)
+    assert job.scraped_at != datetime(2026, 6, 23, 10, 23, 26)
+    assert job.raw_metadata["publication_date"] == "2026-06-23T10:23:26"
     assert job.raw_metadata["salary"] == "$120k"
     assert job.raw_metadata["job_type"] == "full_time"
     assert job.raw_metadata["tags"] == ["python", "agents"]
