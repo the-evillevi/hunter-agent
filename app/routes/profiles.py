@@ -41,8 +41,13 @@ def _profiles_context(
     remotive = session.exec(
         select(Source).where(func.lower(Source.name) == "remotive")
     ).first()
+    try:
+        profiles = list_profiles(session)
+    except ProfileError as profile_error:
+        profiles = []
+        error = str(profile_error)
     return {
-        "profiles": list_profiles(session),
+        "profiles": profiles,
         "companies": companies,
         "remotive": remotive,
         "remotive_categories": list(RemotiveCategory),
@@ -147,7 +152,7 @@ async def create_source_query_route(
         lambda: create_source_query(
             session,
             profile_id=profile_id,
-            source_id=int(_one(form, "source_id")),
+            source_id=_integer(form, "source_id", "source"),
             raw_query=_query_values(form),
         ),
     )
@@ -231,8 +236,8 @@ async def _read_form(request: Request) -> dict[str, list[str]]:
 def _profile_values(form: dict[str, list[str]]) -> dict:
     return {
         "role_name": _one(form, "role_name"),
-        "salary_min": int(_one(form, "salary_min")),
-        "match_threshold": int(_one(form, "match_threshold")),
+        "salary_min": _integer(form, "salary_min", "salary minimum"),
+        "match_threshold": _integer(form, "match_threshold", "match threshold"),
         "active": _one(form, "active", "") == "true",
         "location_types": form.get("location_type", []),
         "keywords": _terms(_one(form, "keywords")),
@@ -243,7 +248,7 @@ def _profile_values(form: dict[str, list[str]]) -> dict:
 def _query_values(form: dict[str, list[str]]) -> dict:
     raw_query: dict = {
         "schema_version": 1,
-        "limit": int(_one(form, "limit")),
+        "limit": _integer(form, "limit", "limit"),
     }
     for field in ("category", "search"):
         value = _one(form, field, "").strip()
@@ -251,8 +256,16 @@ def _query_values(form: dict[str, list[str]]) -> dict:
             raw_query[field] = value
     company_id = _one(form, "company_id", "").strip()
     if company_id:
-        raw_query["company_id"] = int(company_id)
+        raw_query["company_id"] = _integer(form, "company_id", "company")
     return raw_query
+
+
+def _integer(form: dict[str, list[str]], name: str, label: str) -> int:
+    raw_value = _one(form, name).strip()
+    try:
+        return int(raw_value)
+    except ValueError as error:
+        raise ProfileError(f"{label} must be a whole number") from error
 
 
 def _one(form: dict[str, list[str]], name: str, default: str | None = None) -> str:

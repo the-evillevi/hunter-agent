@@ -358,6 +358,60 @@ def test_profile_route_returns_conflict_when_job_references_profile(
     assert "deactivate it instead" in response.text
 
 
+def test_profiles_page_returns_bounded_error_for_invalid_persisted_query(
+    client,
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Remotive", enabled=True)
+    session.add(source)
+    session.commit()
+    session.add(
+        ProfileSourceQuery(
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            query_json=json.dumps(
+                {"schema_version": 1, "category": "sales", "limit": 5}
+            ),
+        )
+    )
+    session.commit()
+
+    response = client.get("/profiles")
+
+    assert response.status_code == 200
+    assert "supported Remotive categories" in response.text
+
+
+def test_profile_routes_return_friendly_numeric_validation_errors(client) -> None:
+    profile_response = client.post(
+        "/profiles",
+        data={
+            "role_name": "Platform Engineer",
+            "salary_min": "oops",
+            "match_threshold": "75",
+            "active": "true",
+            "location_type": "remote",
+            "keywords": "Python",
+        },
+    )
+    query_response = client.post(
+        "/profiles/1/source-queries",
+        data={
+            "source_id": "1",
+            "search": "platform",
+            "limit": "many",
+        },
+    )
+
+    assert profile_response.status_code == 400
+    assert "salary minimum must be a whole number" in profile_response.text
+    assert "invalid literal" not in profile_response.text
+    assert query_response.status_code == 400
+    assert "limit must be a whole number" in query_response.text
+    assert "invalid literal" not in query_response.text
+
+
 def test_source_query_routes_support_update_and_delete(
     client,
     session: Session,
