@@ -96,16 +96,23 @@ class RemotiveJobSourceAdapter:
         )
 
     async def _get_json(self, params: dict[str, str]) -> Mapping[str, Any]:
-        if self._client is not None:
-            response = await self._client.get(self._base_url, params=params)
-            return _response_json(response)
+        try:
+            if self._client is not None:
+                response = await self._client.get(self._base_url, params=params)
+                return _response_json(response)
 
-        headers = {
-            "User-Agent": "hunter-agent Remotive adapter; source attribution: Remotive"
-        }
-        async with httpx.AsyncClient(timeout=self._timeout, headers=headers) as client:
-            response = await client.get(self._base_url, params=params)
-            return _response_json(response)
+            headers = {
+                "User-Agent": "hunter-agent Remotive adapter; source attribution: Remotive"
+            }
+            async with httpx.AsyncClient(
+                timeout=self._timeout, headers=headers
+            ) as client:
+                response = await client.get(self._base_url, params=params)
+                return _response_json(response)
+        except httpx.RequestError as error:
+            raise RemotiveAdapterError(
+                f"Remotive API request failed: {error}"
+            ) from error
 
     def _skip(self, reason: str, payload: object) -> None:
         diagnostic = {"reason": reason, "payload": payload}

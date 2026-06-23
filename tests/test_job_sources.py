@@ -407,6 +407,19 @@ def test_remotive_adapter_raises_for_invalid_json() -> None:
     asyncio.run(assert_failure())
 
 
+def test_remotive_adapter_wraps_transport_failures() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("network unavailable", request=request)
+
+    async def assert_failure() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            adapter = RemotiveJobSourceAdapter(client=client)
+            with pytest.raises(RemotiveAdapterError, match="request failed"):
+                await adapter.fetch(JobSourceRunContext())
+
+    asyncio.run(assert_failure())
+
+
 def test_default_registry_includes_remotive_adapter() -> None:
     with make_session() as session:
         session.add(Source(name="Remotive", enabled=True))
