@@ -36,11 +36,9 @@ class RemotiveJobSourceAdapter:
         self._client = client
         self._base_url = base_url
         self._timeout = timeout
-        self.skipped_jobs: list[dict[str, Any]] = []
 
     async def fetch(self, context: JobSourceRunContext) -> Sequence[Mapping[str, Any]]:
         """Fetch Remotive jobs and skip records outside the run context."""
-        self.skipped_jobs.clear()
         params = _request_params(context.source_query)
         response_payload = await self._get_json(params)
         jobs = response_payload.get("jobs")
@@ -115,9 +113,7 @@ class RemotiveJobSourceAdapter:
             ) from error
 
     def _skip(self, reason: str, payload: object) -> None:
-        diagnostic = {"reason": reason, "payload": payload}
-        self.skipped_jobs.append(diagnostic)
-        logger.warning("Skipping Remotive job: %s", reason)
+        logger.warning("Skipping Remotive job%s: %s", _job_label(payload), reason)
 
 
 def _request_params(source_query: Mapping[str, Any]) -> dict[str, str]:
@@ -207,3 +203,18 @@ def _optional_text(value: object) -> str | None:
 
 def _metadata_value(value: object) -> object:
     return value if value not in ("", None) else None
+
+
+def _job_label(payload: object) -> str:
+    if not isinstance(payload, Mapping):
+        return ""
+    parts = []
+    job_id = _optional_text(payload.get("id"))
+    title = _optional_text(payload.get("title"))
+    if job_id is not None:
+        parts.append(f"id={job_id}")
+    if title is not None:
+        parts.append(f"title={title!r}")
+    if not parts:
+        return ""
+    return " " + " ".join(parts)

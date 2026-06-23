@@ -331,8 +331,8 @@ def test_remotive_identity_hash_uses_provider_id() -> None:
     assert changed.identity_hash == first.identity_hash
 
 
-def test_remotive_adapter_skips_malformed_and_excluded_jobs() -> None:
-    async def run_fetch() -> RemotiveJobSourceAdapter:
+def test_remotive_adapter_skips_malformed_and_excluded_jobs(caplog) -> None:
+    async def run_fetch() -> None:
         async with make_remotive_client(
             {
                 "jobs": [
@@ -348,15 +348,14 @@ def test_remotive_adapter_skips_malformed_and_excluded_jobs() -> None:
                 JobSourceRunContext(exclude_keywords=("recruiter",))
             )
             assert [job["id"] for job in jobs] == [1]
-            return adapter
 
-    adapter = asyncio.run(run_fetch())
+    asyncio.run(run_fetch())
 
-    assert [skip["reason"] for skip in adapter.skipped_jobs] == [
-        "job matched an excluded keyword",
-        "job is missing title, company, or location",
-        "job payload is not an object",
-    ]
+    assert "Skipping Remotive job id=2 title='Recruiter'" in caplog.text
+    assert "job matched an excluded keyword" in caplog.text
+    assert "Skipping Remotive job id=3 title='AI Engineer'" in caplog.text
+    assert "job is missing title, company, or location" in caplog.text
+    assert "job payload is not an object" in caplog.text
 
 
 def test_remotive_adapter_filters_non_remote_location_types() -> None:
