@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+import subprocess
+import sys
 from typing import Any
 
 import httpx
@@ -415,6 +417,25 @@ def test_default_registry_includes_remotive_adapter() -> None:
     assert [resolved.adapter.identity.name for resolved in resolved_sources] == [
         "remotive"
     ]
+
+
+def test_default_registry_registers_remotive_from_sources_import_only() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from app.services.sources import default_source_registry; "
+                "print(default_source_registry.resolve_selected(['remotive'])[0]"
+                ".adapter.identity.display_name)"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "Remotive"
 
 
 def test_scrape_jobs_with_default_registry_can_resolve_remotive() -> None:

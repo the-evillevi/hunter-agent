@@ -12,7 +12,6 @@ from app.services.sources import (
     JobSourceIdentity,
     JobSourceRunContext,
     NormalizedJob,
-    default_source_registry,
 )
 
 logger = logging.getLogger(__name__)
@@ -201,6 +200,3 @@ def _optional_text(value: object) -> str | None:
 
 def _metadata_value(value: object) -> object:
     return value if value not in ("", None) else None
-
-
-default_source_registry.register(RemotiveJobSourceAdapter())
