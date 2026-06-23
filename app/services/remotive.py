@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from datetime import datetime
 import logging
 from typing import Any
 
@@ -94,7 +93,6 @@ class RemotiveJobSourceAdapter:
                 "company_logo": _optional_text(raw_job.get("company_logo")),
                 "payload": dict(raw_job),
             },
-            scraped_at=_parse_datetime(publication_date),
             profile_id=context.profile_id,
         )
 
@@ -203,15 +201,6 @@ def _optional_text(value: object) -> str | None:
 
 def _metadata_value(value: object) -> object:
     return value if value not in ("", None) else None
-
-
-def _parse_datetime(value: str | None) -> datetime | None:
-    if value is None:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
 
 
 default_source_registry.register(RemotiveJobSourceAdapter())
