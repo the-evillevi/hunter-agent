@@ -19,7 +19,6 @@ from app.models.profile import (
     ProfileKeyword,
     ProfileLocationType,
     ProfileSourceQuery,
-    RemotiveCategory,
     RemotiveProfileQuery,
 )
 from app.models.source import Source
