@@ -55,6 +55,12 @@ class ProfileDetail:
     source_queries: tuple[ProfileQueryView, ...]
 
 
+@dataclass(frozen=True)
+class ValidatedSourceQuery:
+    query: RemotiveProfileQuery
+    company: Company | None
+
+
 def list_profiles(session: Session) -> list[ProfileDetail]:
     rows = session.exec(select(Profile).order_by(func.lower(Profile.role_name))).all()
     return [_profile_detail(session, profile) for profile in rows]
@@ -230,7 +236,10 @@ def list_profile_runs_for_source(
     contexts = []
     for query_row, profile in rows:
         detail = _profile_detail(session, profile)
-        query = _parse_source_query(source, query_row.query_json)
+        validated = _validate_source_query_json(session, source, query_row.query_json)
+        source_query = validated.query.model_dump(mode="json", exclude_none=True)
+        if validated.company is not None:
+            source_query["company_name"] = validated.company.name
         contexts.append(
             JobSourceRunContext(
                 profile_id=profile.id,
@@ -239,7 +248,10 @@ def list_profile_runs_for_source(
                 location_types=tuple(value.value for value in detail.location_types),
                 salary_min=profile.salary_min,
                 match_threshold=profile.match_threshold,
-                source_query=query.model_dump(mode="json", exclude_none=True),
+                company_name=(
+                    validated.company.name if validated.company is not None else None
+                ),
+                source_query=source_query,
             )
         )
     return contexts
@@ -265,11 +277,15 @@ def _profile_detail(session: Session, profile: Profile) -> ProfileDetail:
     ).all()
     queries = []
     for row, source in query_rows:
-        query = _parse_source_query(source, row.query_json)
-        company_name = (
-            session.get(Company, query.company_id).name if query.company_id else None
+        validated = _validate_source_query_json(session, source, row.query_json)
+        queries.append(
+            ProfileQueryView(
+                row,
+                source.name,
+                validated.query,
+                validated.company.name if validated.company is not None else None,
+            )
         )
-        queries.append(ProfileQueryView(row, source.name, query, company_name))
     return ProfileDetail(
         profile=profile,
         location_types=tuple(LocationType(value) for value in locations),
@@ -392,19 +408,60 @@ def _parse_source_query(source: Source, query_json: str) -> RemotiveProfileQuery
     try:
         return RemotiveProfileQuery.model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(str(error)) from error
+        raise ProfileError(_format_query_validation_error(error)) from error
+
+
+def _validate_source_query_json(
+    session: Session,
+    source: Source,
+    query_json: str,
+) -> ValidatedSourceQuery:
+    query = _parse_source_query(source, query_json)
+    return ValidatedSourceQuery(
+        query=query, company=_resolve_query_company(session, query)
+    )
 
 
 def _validated_query_json(session: Session, source: Source, raw_query: dict) -> str:
     try:
         query = RemotiveProfileQuery.model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(str(error)) from error
+        raise ProfileError(_format_query_validation_error(error)) from error
     if source.name.lower() != "remotive":
         raise ProfileError(f'no query schema is registered for source "{source.name}"')
-    if query.company_id is not None and session.get(Company, query.company_id) is None:
-        raise ProfileError(f"company {query.company_id} was not found")
+    _resolve_query_company(session, query)
     return query.model_dump_json(exclude_none=True)
+
+
+def _resolve_query_company(
+    session: Session,
+    query: RemotiveProfileQuery,
+) -> Company | None:
+    if query.company_id is None:
+        return None
+    company = session.get(Company, query.company_id)
+    if company is None:
+        raise ProfileError(f"company {query.company_id} was not found")
+    return company
+
+
+def _format_query_validation_error(error: ValidationError) -> str:
+    messages = []
+    for issue in error.errors():
+        field = ".".join(str(part) for part in issue["loc"]) or "query"
+        if field == "category":
+            messages.append("category must be one of the supported Remotive categories")
+        elif field == "search":
+            messages.append("search must not be blank")
+        elif field == "limit":
+            messages.append("limit must be between 1 and 10")
+        elif field == "company_id":
+            messages.append("company must be a persisted company")
+        elif field == "schema_version":
+            messages.append("schema version must be 1")
+        else:
+            messages.append(f"{field} is not valid")
+    return "; ".join(dict.fromkeys(messages))
 
 
 def _ensure_unique_query(

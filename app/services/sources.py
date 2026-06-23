@@ -74,6 +74,7 @@ class JobSourceRunContext:
     location_types: tuple[str, ...] = ()
     salary_min: int | None = None
     match_threshold: int | None = None
+    company_name: str | None = None
     source_query: Mapping[str, Any] = field(default_factory=dict)
 
 

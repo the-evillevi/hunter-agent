@@ -207,6 +207,77 @@ def test_list_profile_runs_for_source_returns_active_validated_contexts(
     assert contexts[0].source_query["search"] == "AI engineer"
 
 
+def test_list_profile_runs_for_source_includes_provider_ready_company(
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Remotive", enabled=True)
+    company = Company(name="Example Corp", ticker="EX")
+    session.add_all([source, company])
+    session.commit()
+    create_source_query(
+        session,
+        profile_id=detail.profile.id,
+        source_id=source.id,
+        raw_query={
+            "schema_version": 1,
+            "company_id": company.id,
+            "search": "AI engineer",
+            "limit": 10,
+        },
+    )
+
+    context = list_profile_runs_for_source(session, "remotive")[0]
+
+    assert context.company_name == "Example Corp"
+    assert context.source_query["company_id"] == company.id
+    assert context.source_query["company_name"] == "Example Corp"
+
+
+def test_persisted_query_with_missing_company_returns_bounded_error(
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Remotive", enabled=True)
+    session.add(source)
+    session.commit()
+    session.add(
+        ProfileSourceQuery(
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            query_json=json.dumps(
+                {"schema_version": 1, "company_id": 999, "search": "AI", "limit": 5}
+            ),
+        )
+    )
+    session.commit()
+
+    with pytest.raises(ProfileError, match="company 999 was not found"):
+        list_profile_runs_for_source(session, "remotive")
+
+
+def test_persisted_query_with_invalid_semantics_returns_bounded_error(
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Remotive", enabled=True)
+    session.add(source)
+    session.commit()
+    session.add(
+        ProfileSourceQuery(
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            query_json=json.dumps(
+                {"schema_version": 1, "category": "sales", "limit": 5}
+            ),
+        )
+    )
+    session.commit()
+
+    with pytest.raises(ProfileError, match="supported Remotive categories"):
+        list_profile_runs_for_source(session, "remotive")
+
+
 def test_delete_profile_rejects_profile_referenced_by_jobs(
     session: Session,
     create_job,
