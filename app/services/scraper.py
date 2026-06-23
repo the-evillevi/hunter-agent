@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from sqlmodel import Session
 
 from app.db.database import engine
+from app.services import remotive  # noqa: F401
 from app.services.sources import (
     JobSourceRegistry,
     JobSourceRunContext,
