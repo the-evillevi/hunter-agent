@@ -254,16 +254,63 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
             ORDER BY name
             """
         ).fetchall()
+        company_counts = connection.execute(
+            "SELECT COUNT(*), SUM(is_sp500) FROM companies"
+        ).fetchone()
+        profile_rows = connection.execute(
+            """
+            SELECT p.role_name,
+                   (SELECT COUNT(*) FROM profile_location_types plt
+                    WHERE plt.profile_id = p.id),
+                   (SELECT COUNT(*) FROM profile_keywords pk
+                    WHERE pk.profile_id = p.id AND pk.kind = 'include'),
+                   (SELECT COUNT(*) FROM profile_keywords pk
+                    WHERE pk.profile_id = p.id AND pk.kind = 'exclude')
+            FROM profiles p
+            ORDER BY p.id
+            """
+        ).fetchall()
+        query_rows = connection.execute(
+            """
+            SELECT p.role_name, s.name,
+                   json_extract(psq.query_json, '$.category'),
+                   COALESCE(
+                     json_extract(psq.query_json, '$.search'),
+                     json_extract(psq.query_json, '$.what')
+                   ),
+                   json_extract(psq.query_json, '$.limit')
+            FROM profile_source_queries psq
+            JOIN profiles p ON p.id = psq.profile_id
+            JOIN sources s ON s.id = psq.source_id
+            ORDER BY psq.id
+            """
+        ).fetchall()
 
     assert application == ("AI/ML Engineer", "Kavak", "pending", None)
     assert blacklist == (
         "Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.",
-        "Palantir Technologies",
+        "PALANTIR TECHNOLOGIES INC A",
     )
     assert sources == [
         ("Adzuna", 1),
         ("Remotive", 1),
-        ("ssga_spy_holdings", 1),
+    ]
+    assert company_counts == (502, 500)
+    assert profile_rows == [
+        ("AI Engineer", 2, 8, 3),
+        ("Senior Fullstack Engineer", 1, 10, 3),
+    ]
+    assert query_rows == [
+        ("AI Engineer", "Remotive", "artificial-intelligence", "AI engineer", 10),
+        (
+            "Senior Fullstack Engineer",
+            "Remotive",
+            "software-development",
+            "fullstack",
+            10,
+        ),
+        ("AI Engineer", "Adzuna", "it-jobs", "AI engineer", None),
+        ("Senior Fullstack Engineer", "Adzuna", "it-jobs", "fullstack", None),
     ]
     assert {
         "ticker",

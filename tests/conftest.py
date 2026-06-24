@@ -90,19 +90,21 @@ def create_job(session: Session) -> Callable[..., Job]:
         score: int | None = 88,
         scraped_at: datetime | None = None,
     ) -> Job:
-        profile = Profile(
-            role_name="AI Engineer",
-            salary_min=60000,
-            location_type="remote",
-            match_threshold=80,
-            active=True,
-        )
+        profile = session.exec(
+            select(Profile).where(Profile.role_name == "AI Engineer")
+        ).first()
+        if profile is None:
+            profile = Profile(
+                role_name="AI Engineer",
+                salary_min=60000,
+                match_threshold=80,
+                active=True,
+            )
+            session.add(profile)
+            session.commit()
         company = get_or_create_named(Company, company_name)
         location = get_or_create_named(Location, location_name)
         source = get_or_create_named(Source, source_name)
-        session.add(profile)
-        session.commit()
-
         job = Job(
             profile_id=profile.id,
             title=title,

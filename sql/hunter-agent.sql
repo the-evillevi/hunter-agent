@@ -8,6 +8,10 @@ DROP TABLE IF EXISTS blacklist;
 
 DROP TABLE IF EXISTS applications;
 
+DROP TABLE IF EXISTS profile_source_queries;
+
+DROP TABLE IF EXISTS profile_location_types;
+
 DROP TABLE IF EXISTS profile_keywords;
 
 DROP TABLE IF EXISTS jobs;
@@ -98,23 +102,46 @@ CREATE TABLE sources (
 
 CREATE TABLE keywords (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL COLLATE NOCASE UNIQUE
 );
 
 CREATE TABLE profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  role_name TEXT,
-  salary_min INT,
-  location_type TEXT CHECK (location_type IN ('remote', 'hybrid', 'onsite')),
-  match_threshold INT CHECK (match_threshold BETWEEN 1 AND 100),
-  active BOOLEAN NOT NULL CHECK (active IN (0, 1))
+  role_name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  salary_min INTEGER NOT NULL DEFAULT 0 CHECK (salary_min >= 0),
+  match_threshold INTEGER NOT NULL DEFAULT 80 CHECK (match_threshold BETWEEN 1 AND 100),
+  active BOOLEAN NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE profile_keywords (
   profile_id INTEGER NOT NULL REFERENCES profiles (id),
   keyword_id INTEGER NOT NULL REFERENCES keywords (id),
+  kind TEXT NOT NULL CHECK (kind IN ('include', 'exclude')),
   PRIMARY KEY (profile_id, keyword_id)
 );
+
+CREATE TABLE profile_location_types (
+  profile_id INTEGER NOT NULL REFERENCES profiles (id),
+  location_type TEXT NOT NULL CHECK (location_type IN ('remote', 'hybrid', 'onsite')),
+  PRIMARY KEY (profile_id, location_type)
+);
+
+CREATE TABLE profile_source_queries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profile_id INTEGER NOT NULL REFERENCES profiles (id),
+  source_id INTEGER NOT NULL REFERENCES sources (id),
+  query_json TEXT NOT NULL CHECK (json_valid(query_json)),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_profile_source_queries_profile_id
+ON profile_source_queries (profile_id);
+
+CREATE INDEX idx_profile_source_queries_source_id
+ON profile_source_queries (source_id);
 
 CREATE TABLE jobs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

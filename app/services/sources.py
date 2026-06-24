@@ -70,6 +70,12 @@ class JobSourceRunContext:
     location: str | None = None
     profile_id: int | None = None
     credentials: Mapping[str, str] = field(default_factory=dict)
+    exclude_keywords: tuple[str, ...] = ()
+    location_types: tuple[str, ...] = ()
+    salary_min: int | None = None
+    match_threshold: int | None = None
+    company_name: str | None = None
+    source_query: Mapping[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -274,3 +280,11 @@ def make_job_identity_hash(
 
 
 default_source_registry = JobSourceRegistry()
+
+
+from app.services.adzuna import AdzunaJobSourceAdapter  # noqa: E402
+from app.services.remotive import RemotiveJobSourceAdapter  # noqa: E402
+
+
+default_source_registry.register(AdzunaJobSourceAdapter())
+default_source_registry.register(RemotiveJobSourceAdapter())
