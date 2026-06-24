@@ -41,51 +41,6 @@ max_tokens = 2048     # full CV section rewrites
 
 
 # ============================================================
-# JOB PROFILES
-# 2-3 roles I'm targetting, each has its own keywords,
-# salary floor and match threshold.
-# ============================================================
-
-[[profiles]]
-role_name = "AI Engineer"
-active = true
-match_threshold = 80 # auto-apply only at or above this score
-salary_min = 60000 # in MXN/month (or 0 to disable filter)
-location_type = ["remote", "hybrid"]
-keywords = [
-  "AI engineer",
-  "machine learning engineer",
-  "LLM",
-  "RAG",
-  "fine-tuning",
-  "MLOps",
-  "Python",
-  "PyTorch",
-]
-exclude_keywords = ["PhD required", "security clearance", "on-site only"]
-
-[[profiles]]
-role_name = "Senior Fullstack Engineer"
-active = true
-match_threshold = 80
-salary_min = 60000
-location_type = "hybrid"
-keywords = [
-  "fullstack",
-  "full-stack",
-  "React",
-  "Node.js",
-  "TypeScript",
-  "REST API",
-  "PostgreSQL",
-  "Next",
-  "Next.js",
-  "Astro",
-]
-exclude_keywords = ["gaming", "blockchain", "web3"]
-
-
-# ============================================================
 # JOB SOURCES
 # Toggle sources on/off without touching code.
 # ============================================================

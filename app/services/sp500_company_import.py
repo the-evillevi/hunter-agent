@@ -230,8 +230,8 @@ def mark_removed_companies(
     source_url = first_source_url(source_companies)
     removal_date = first_holdings_as_of(source_companies) or imported_at.date()
     active_companies = session.exec(
-        select(Company).where(Company.is_sp500 == True)
-    ).all()  # noqa: E712
+        select(Company).where(Company.is_sp500 == True)  # noqa: E712
+    ).all()
     removed_count = 0
     for company in active_companies:
         if company.id in seen_company_ids:

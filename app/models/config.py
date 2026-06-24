@@ -103,36 +103,6 @@ class OllamaConfig(StrictConfigModel):
     tailor: OllamaModelConfig
 
 
-class ProfileConfig(StrictConfigModel):
-    """One target job profile from config.toml."""
-
-    role_name: str
-    active: bool
-    match_threshold: int = Field(ge=1, le=100)
-    salary_min: int = Field(ge=0)
-    location_type: (
-        Literal["remote", "hybrid", "onsite"]
-        | list[Literal["remote", "hybrid", "onsite"]]
-    )
-    keywords: list[str] = Field(min_length=1)
-    exclude_keywords: list[str] = Field(default_factory=list)
-
-    @field_validator("keywords")
-    @classmethod
-    def keywords_must_not_be_blank(cls, keywords: list[str]) -> list[str]:
-        """Reject blank or duplicate keywords because they make matching noisy."""
-        return normalize_profile_keywords(keywords, "profile keywords")
-
-    @field_validator("exclude_keywords")
-    @classmethod
-    def exclude_keywords_must_not_be_blank_or_duplicate(
-        cls,
-        keywords: list[str],
-    ) -> list[str]:
-        """Reject blank or duplicate excluded keywords."""
-        return normalize_profile_keywords(keywords, "profile exclude_keywords")
-
-
 class AdzunaSourceConfig(StrictConfigModel):
     """Adzuna source settings."""
 
@@ -261,7 +231,6 @@ class AppConfig(StrictConfigModel):
     agent: AgentConfig
     scheduler: SchedulerConfig
     ollama: OllamaConfig
-    profiles: list[ProfileConfig] = Field(min_length=1)
     sources: SourcesConfig
     application: ApplicationConfig
 
@@ -270,23 +239,3 @@ def is_placeholder(value: str) -> bool:
     """Return whether a config value still looks like template text."""
     normalized = value.strip().upper()
     return normalized.startswith(PLACEHOLDER_PREFIXES)
-
-
-def normalize_profile_keywords(keywords: list[str], field_name: str) -> list[str]:
-    """Strip keywords and reject case-insensitive duplicates."""
-    normalized_keywords: list[str] = []
-    seen: set[str] = set()
-
-    for keyword in keywords:
-        normalized_keyword = keyword.strip()
-        if not normalized_keyword:
-            raise ValueError(f"{field_name} cannot be blank")
-
-        duplicate_key = normalized_keyword.casefold()
-        if duplicate_key in seen:
-            raise ValueError(f"{field_name} cannot contain case-insensitive duplicates")
-
-        seen.add(duplicate_key)
-        normalized_keywords.append(normalized_keyword)
-
-    return normalized_keywords
