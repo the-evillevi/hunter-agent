@@ -282,7 +282,9 @@ def make_job_identity_hash(
 default_source_registry = JobSourceRegistry()
 
 
+from app.services.adzuna import AdzunaJobSourceAdapter  # noqa: E402
 from app.services.remotive import RemotiveJobSourceAdapter  # noqa: E402
 
 
+default_source_registry.register(AdzunaJobSourceAdapter())
 default_source_registry.register(RemotiveJobSourceAdapter())
