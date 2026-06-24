@@ -121,6 +121,7 @@
           <div class="divider">Source queries</div>
           {% for query_view in detail.source_queries %}
             {% set query = query_view.query %}
+            {% set source_key = query_view.source_name|lower %}
             <form
               class="border-base-300 grid gap-3 rounded-lg border p-3 md:grid-cols-2 lg:grid-cols-4"
               hx-patch="/profiles/{{ profile.id }}/source-queries/{{ query_view.row.id }}"
@@ -130,54 +131,104 @@
               <p class="font-semibold md:col-span-2 lg:col-span-4">
                 {{ query_view.source_name }}
               </p>
-              <label class="form-control">
-                <span class="label-text mb-1">Category</span>
-                <select class="select select-bordered" name="category">
-                  <option value="">Any</option>
-                  {% for category in remotive_categories %}
-                    <option
-                      value="{{ category.value }}"
-                      {% if query.category == category %}selected{% endif %}
-                    >
-                      {{ category.value }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Company</span>
-                <select class="select select-bordered" name="company_id">
-                  <option value="">Any</option>
-                  {% for company in companies %}
-                    <option
-                      value="{{ company.id }}"
-                      {% if query.company_id == company.id %}selected{% endif %}
-                    >
-                      {{ company.name }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Search</span>
-                <input
-                  class="input input-bordered"
-                  name="search"
-                  value="{{ query.search or '' }}"
-                />
-              </label>
-              <label class="form-control">
-                <span class="label-text mb-1">Limit</span>
-                <input
-                  class="input input-bordered"
-                  type="number"
-                  name="limit"
-                  min="1"
-                  max="10"
-                  value="{{ query.limit }}"
-                  required
-                />
-              </label>
+              {% if source_key == "remotive" %}
+                <label class="form-control">
+                  <span class="label-text mb-1">Category</span>
+                  <select class="select select-bordered" name="category">
+                    <option value="">Any</option>
+                    {% for category in remotive_categories %}
+                      <option
+                        value="{{ category.value }}"
+                        {% if query.category == category %}selected{% endif %}
+                      >
+                        {{ category.value }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Company</span>
+                  <select class="select select-bordered" name="company_id">
+                    <option value="">Any</option>
+                    {% for company in companies %}
+                      <option
+                        value="{{ company.id }}"
+                        {% if query.company_id == company.id %}selected{% endif %}
+                      >
+                        {{ company.name }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Search</span>
+                  <input
+                    class="input input-bordered"
+                    name="search"
+                    value="{{ query.search or '' }}"
+                  />
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Limit</span>
+                  <input
+                    class="input input-bordered"
+                    type="number"
+                    name="limit"
+                    min="1"
+                    max="10"
+                    value="{{ query.limit }}"
+                    required
+                  />
+                </label>
+              {% elif source_key == "adzuna" %}
+                <label class="form-control">
+                  <span class="label-text mb-1">Search</span>
+                  <input
+                    class="input input-bordered"
+                    name="what"
+                    value="{{ query.what }}"
+                    required
+                  />
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Location</span>
+                  <input
+                    class="input input-bordered"
+                    name="where"
+                    value="{{ query.where or '' }}"
+                  />
+                </label>
+                <label class="form-control">
+                  <span class="label-text mb-1">Category</span>
+                  <input
+                    class="input input-bordered"
+                    name="category"
+                    value="{{ query.category or '' }}"
+                  />
+                </label>
+                <div class="flex flex-wrap items-end gap-4 pb-3">
+                  <label class="flex items-center gap-2">
+                    <input
+                      class="checkbox checkbox-sm"
+                      type="checkbox"
+                      name="full_time"
+                      value="true"
+                      {% if query.full_time %}checked{% endif %}
+                    />
+                    Full time
+                  </label>
+                  <label class="flex items-center gap-2">
+                    <input
+                      class="checkbox checkbox-sm"
+                      type="checkbox"
+                      name="permanent"
+                      value="true"
+                      {% if query.permanent %}checked{% endif %}
+                    />
+                    Permanent
+                  </label>
+                </div>
+              {% endif %}
               <div class="flex gap-2 md:col-span-2 lg:col-span-4">
                 <button class="btn btn-primary btn-sm" type="submit">
                   Save query
@@ -194,6 +245,58 @@
               </div>
             </form>
           {% endfor %}
+
+          {% if adzuna %}
+            <form
+              class="border-base-300 mt-3 grid gap-3 rounded-lg border border-dashed p-3 md:grid-cols-2 lg:grid-cols-4"
+              hx-post="/profiles/{{ profile.id }}/source-queries"
+              hx-target="#profiles-list"
+              hx-swap="innerHTML"
+            >
+              <input type="hidden" name="source_id" value="{{ adzuna.id }}" />
+              <p class="font-semibold md:col-span-2 lg:col-span-4">
+                Add Adzuna query
+              </p>
+              <label class="form-control">
+                <span class="label-text mb-1">Search</span>
+                <input class="input input-bordered" name="what" required />
+              </label>
+              <label class="form-control">
+                <span class="label-text mb-1">Location</span>
+                <input class="input input-bordered" name="where" />
+              </label>
+              <label class="form-control">
+                <span class="label-text mb-1">Category</span>
+                <input class="input input-bordered" name="category" />
+              </label>
+              <div class="flex flex-wrap items-end gap-4 pb-3">
+                <label class="flex items-center gap-2">
+                  <input
+                    class="checkbox checkbox-sm"
+                    type="checkbox"
+                    name="full_time"
+                    value="true"
+                  />
+                  Full time
+                </label>
+                <label class="flex items-center gap-2">
+                  <input
+                    class="checkbox checkbox-sm"
+                    type="checkbox"
+                    name="permanent"
+                    value="true"
+                  />
+                  Permanent
+                </label>
+              </div>
+              <button
+                class="btn btn-outline btn-sm md:col-span-2 md:justify-self-start lg:col-span-4"
+                type="submit"
+              >
+                Add Adzuna query
+              </button>
+            </form>
+          {% endif %}
 
           {% if remotive %}
             <form

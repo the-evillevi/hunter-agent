@@ -154,6 +154,68 @@ def test_remotive_query_resolves_company_and_rejects_duplicates(
         )
 
 
+@pytest.mark.parametrize(
+    "raw_query",
+    [
+        {"schema_version": 1, "where": "Remote"},
+        {"schema_version": 1, "what": " "},
+        {"schema_version": 1, "what": "AI", "where": " "},
+        {"schema_version": 1, "what": "AI", "category": " "},
+        {"schema_version": 2, "what": "AI"},
+        {"schema_version": 1, "what": "AI", "company_id": 1},
+    ],
+)
+def test_adzuna_query_validation_rejects_invalid_values(
+    session: Session,
+    raw_query: dict,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Adzuna", enabled=True)
+    session.add(source)
+    session.commit()
+
+    with pytest.raises(ProfileError):
+        create_source_query(
+            session,
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            raw_query=raw_query,
+        )
+
+
+def test_adzuna_query_persists_and_rejects_duplicates(session: Session) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Adzuna", enabled=True)
+    session.add(source)
+    session.commit()
+    raw_query = {
+        "schema_version": 1,
+        "what": "AI engineer",
+        "where": "Remote",
+        "category": "it-jobs",
+        "full_time": True,
+        "permanent": True,
+    }
+
+    updated = create_source_query(
+        session,
+        profile_id=detail.profile.id,
+        source_id=source.id,
+        raw_query=raw_query,
+    )
+
+    assert updated.source_queries[0].query.what == "AI engineer"
+    assert updated.source_queries[0].query.where == "Remote"
+    assert updated.source_queries[0].query.full_time is True
+    with pytest.raises(ProfileConflictError, match="duplicate"):
+        create_source_query(
+            session,
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            raw_query=raw_query,
+        )
+
+
 def test_database_rejects_malformed_query_json(session: Session) -> None:
     detail = create_complete_profile(session)
     source = Source(name="Remotive", enabled=True)
@@ -234,6 +296,45 @@ def test_list_profile_runs_for_source_includes_provider_ready_company(
     assert context.source_query["company_name"] == "Example Corp"
 
 
+def test_list_profile_runs_for_source_returns_adzuna_contexts(
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Adzuna", enabled=True)
+    session.add(source)
+    session.commit()
+    create_source_query(
+        session,
+        profile_id=detail.profile.id,
+        source_id=source.id,
+        raw_query={
+            "schema_version": 1,
+            "what": "AI engineer",
+            "where": "Remote",
+            "category": "it-jobs",
+            "full_time": True,
+            "permanent": True,
+        },
+    )
+
+    context = list_profile_runs_for_source(session, "adzuna")[0]
+
+    assert context.profile_id == detail.profile.id
+    assert context.keywords == detail.keywords
+    assert context.exclude_keywords == detail.exclude_keywords
+    assert context.location_types == ("hybrid", "remote")
+    assert context.salary_min == 60_000
+    assert context.company_name is None
+    assert context.source_query == {
+        "schema_version": 1,
+        "what": "AI engineer",
+        "where": "Remote",
+        "category": "it-jobs",
+        "full_time": True,
+        "permanent": True,
+    }
+
+
 def test_persisted_query_with_missing_company_returns_bounded_error(
     session: Session,
 ) -> None:
@@ -276,6 +377,26 @@ def test_persisted_query_with_invalid_semantics_returns_bounded_error(
 
     with pytest.raises(ProfileError, match="supported Remotive categories"):
         list_profile_runs_for_source(session, "remotive")
+
+
+def test_persisted_adzuna_query_with_invalid_semantics_returns_bounded_error(
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Adzuna", enabled=True)
+    session.add(source)
+    session.commit()
+    session.add(
+        ProfileSourceQuery(
+            profile_id=detail.profile.id,
+            source_id=source.id,
+            query_json=json.dumps({"schema_version": 1, "where": "Remote"}),
+        )
+    )
+    session.commit()
+
+    with pytest.raises(ProfileError, match="what is required"):
+        list_profile_runs_for_source(session, "adzuna")
 
 
 def test_delete_profile_rejects_profile_referenced_by_jobs(
@@ -342,6 +463,46 @@ def test_profiles_page_and_crud_routes(client, session: Session) -> None:
     assert update_response.status_code == 200
     assert "Senior Platform Engineer" in update_response.text
     assert "Inactive" in update_response.text
+
+
+def test_profiles_page_supports_adzuna_query_routes(
+    client,
+    session: Session,
+) -> None:
+    detail = create_complete_profile(session)
+    source = Source(name="Adzuna", enabled=True)
+    session.add(source)
+    session.commit()
+
+    create_response = client.post(
+        f"/profiles/{detail.profile.id}/source-queries",
+        data={
+            "source_id": str(source.id),
+            "what": "AI engineer",
+            "where": "Remote",
+            "category": "it-jobs",
+            "full_time": "true",
+            "permanent": "true",
+        },
+    )
+    session.expire_all()
+    query_id = session.exec(select(ProfileSourceQuery)).one().id
+    update_response = client.patch(
+        f"/profiles/{detail.profile.id}/source-queries/{query_id}",
+        data={
+            "what": "ML engineer",
+            "where": "Mexico",
+            "category": "it-jobs",
+        },
+    )
+
+    assert create_response.status_code == 200
+    assert "Adzuna" in create_response.text
+    assert "AI engineer" in create_response.text
+    assert "Remote" in create_response.text
+    assert update_response.status_code == 200
+    assert "ML engineer" in update_response.text
+    assert "Mexico" in update_response.text
 
 
 def test_profile_route_returns_conflict_when_job_references_profile(

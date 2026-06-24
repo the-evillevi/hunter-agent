@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from app.models.company import Company
 from app.models.job import Job
 from app.models.profile import (
+    AdzunaProfileQuery,
     Keyword,
     KeywordKind,
     LocationType,
@@ -23,6 +24,8 @@ from app.models.profile import (
 )
 from app.models.source import Source
 from app.services.sources import JobSourceRunContext
+
+type SourceProfileQuery = AdzunaProfileQuery | RemotiveProfileQuery
 
 
 class ProfileError(ValueError):
@@ -41,7 +44,7 @@ class ProfileConflictError(ProfileError):
 class ProfileQueryView:
     row: ProfileSourceQuery
     source_name: str
-    query: RemotiveProfileQuery
+    query: SourceProfileQuery
     company_name: str | None
 
 
@@ -56,7 +59,7 @@ class ProfileDetail:
 
 @dataclass(frozen=True)
 class ValidatedSourceQuery:
-    query: RemotiveProfileQuery
+    query: SourceProfileQuery
     company: Company | None
 
 
@@ -397,17 +400,15 @@ def _get_source(session: Session, source_id: int) -> Source:
     return source
 
 
-def _parse_source_query(source: Source, query_json: str) -> RemotiveProfileQuery:
+def _parse_source_query(source: Source, query_json: str) -> SourceProfileQuery:
     try:
         raw_query = json.loads(query_json)
     except json.JSONDecodeError as error:
         raise ProfileError("source query contains malformed JSON") from error
-    if source.name.lower() != "remotive":
-        raise ProfileError(f'no query schema is registered for source "{source.name}"')
     try:
-        return RemotiveProfileQuery.model_validate(raw_query)
+        return _query_model_for_source(source).model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(_format_query_validation_error(error)) from error
+        raise ProfileError(_format_query_validation_error(source, error)) from error
 
 
 def _validate_source_query_json(
@@ -423,19 +424,30 @@ def _validate_source_query_json(
 
 def _validated_query_json(session: Session, source: Source, raw_query: dict) -> str:
     try:
-        query = RemotiveProfileQuery.model_validate(raw_query)
+        query = _query_model_for_source(source).model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(_format_query_validation_error(error)) from error
-    if source.name.lower() != "remotive":
-        raise ProfileError(f'no query schema is registered for source "{source.name}"')
+        raise ProfileError(_format_query_validation_error(source, error)) from error
     _resolve_query_company(session, query)
     return query.model_dump_json(exclude_none=True)
 
 
+def _query_model_for_source(
+    source: Source,
+) -> type[AdzunaProfileQuery] | type[RemotiveProfileQuery]:
+    source_name = source.name.lower()
+    if source_name == "adzuna":
+        return AdzunaProfileQuery
+    if source_name == "remotive":
+        return RemotiveProfileQuery
+    raise ProfileError(f'no query schema is registered for source "{source.name}"')
+
+
 def _resolve_query_company(
     session: Session,
-    query: RemotiveProfileQuery,
+    query: SourceProfileQuery,
 ) -> Company | None:
+    if not isinstance(query, RemotiveProfileQuery):
+        return None
     if query.company_id is None:
         return None
     company = session.get(Company, query.company_id)
@@ -444,14 +456,21 @@ def _resolve_query_company(
     return company
 
 
-def _format_query_validation_error(error: ValidationError) -> str:
+def _format_query_validation_error(source: Source, error: ValidationError) -> str:
     messages = []
+    source_name = source.name.lower()
     for issue in error.errors():
         field = ".".join(str(part) for part in issue["loc"]) or "query"
-        if field == "category":
+        if field == "category" and source_name == "remotive":
             messages.append("category must be one of the supported Remotive categories")
+        elif field == "category":
+            messages.append("category must not be blank")
         elif field == "search":
             messages.append("search must not be blank")
+        elif field == "what":
+            messages.append("what is required")
+        elif field == "where":
+            messages.append("where must not be blank")
         elif field == "limit":
             messages.append("limit must be between 1 and 10")
         elif field == "company_id":
