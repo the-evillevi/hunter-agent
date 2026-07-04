@@ -12,6 +12,7 @@ from app.services.sources import (
     JobSourceIdentity,
     JobSourceRunContext,
     NormalizedJob,
+    default_source_registry,
 )
 
 logger = logging.getLogger(__name__)
@@ -218,3 +219,8 @@ def _job_label(payload: object) -> str:
     if not parts:
         return ""
     return " " + " ".join(parts)
+
+
+# Self-register so importing this module (which app.services.sources does at
+# its bottom) makes the adapter resolvable through the default registry.
+default_source_registry.register(RemotiveJobSourceAdapter())

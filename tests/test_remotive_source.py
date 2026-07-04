@@ -239,6 +239,26 @@ def test_default_registry_registers_remotive_from_sources_import_only() -> None:
     assert result.stdout.strip() == "Remotive"
 
 
+def test_remotive_module_can_be_imported_before_sources() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import app.services.remotive; "
+                "from app.services.sources import default_source_registry; "
+                "print(default_source_registry.resolve_selected(['remotive'])[0]"
+                ".adapter.identity.display_name)"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "Remotive"
+
+
 def test_scrape_jobs_with_default_registry_can_resolve_remotive() -> None:
     with make_session() as session:
         session.add(Source(name="Remotive", enabled=True))
