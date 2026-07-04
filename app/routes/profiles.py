@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 
 from app.db.database import get_session
 from app.models.company import Company
-from app.models.profile import RemotiveCategory
+from app.models.profile import LocationType, RemotiveCategory
 from app.models.source import Source
 from app.services.profiles import (
     ProfileConflictError,
@@ -37,6 +37,7 @@ def _profiles_context(
     *,
     error: str | None = None,
 ) -> dict:
+    """Build the template context shared by the full page and the fragment."""
     companies = session.exec(select(Company).order_by(func.lower(Company.name))).all()
     remotive = session.exec(
         select(Source).where(func.lower(Source.name) == "remotive")
@@ -51,6 +52,7 @@ def _profiles_context(
         "companies": companies,
         "remotive": remotive,
         "remotive_categories": list(RemotiveCategory),
+        "location_types": [value.value for value in LocationType],
         "error": error,
     }
 
@@ -62,6 +64,7 @@ def _render_list(
     error: str | None = None,
     status_code: int = 200,
 ) -> HTMLResponse:
+    """Render the list fragment, optionally with a bounded error banner."""
     return templates.TemplateResponse(
         request,
         "_profiles_list.html",
@@ -146,7 +149,7 @@ async def create_source_query_route(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     form = await _read_form(request)
-    return await _mutate_query(
+    return _mutate_query(
         request,
         session,
         lambda: create_source_query(
@@ -169,7 +172,7 @@ async def update_source_query_route(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     form = await _read_form(request)
-    return await _mutate_query(
+    return _mutate_query(
         request,
         session,
         lambda: update_source_query(
@@ -198,11 +201,12 @@ def delete_source_query_route(
     return _render_list(request, session)
 
 
-async def _mutate_query(
+def _mutate_query(
     request: Request,
     session: Session,
-    mutation: Callable,
+    mutation: Callable[[], object],
 ) -> HTMLResponse:
+    """Run one source-query mutation and render the refreshed fragment."""
     try:
         mutation()
     except (ProfileError, ValueError) as error:
@@ -215,6 +219,7 @@ def _profile_error(
     session: Session,
     error: Exception,
 ) -> HTMLResponse:
+    """Map a bounded profile error onto the fragment with a fitting status."""
     if isinstance(error, ProfileNotFoundError):
         status_code = 404
     elif isinstance(error, ProfileConflictError):

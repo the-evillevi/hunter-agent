@@ -19,11 +19,21 @@ from app.models.profile import (
     ProfileKeyword,
     ProfileLocationType,
     ProfileSourceQuery,
-    RemotiveCategory,
     RemotiveProfileQuery,
 )
 from app.models.source import Source
-from app.services.sources import JobSourceRunContext
+from app.services.sources import (
+    JobSourceRunContext,
+    SourceNotFoundError,
+    get_source,
+    normalize_source_name,
+)
+
+# One query schema per source; new adapters register their schema here so the
+# service and routes stay source-agnostic (HNTR-18 adds Adzuna).
+SOURCE_QUERY_SCHEMAS: dict[str, type[RemotiveProfileQuery]] = {
+    "remotive": RemotiveProfileQuery,
+}
 
 
 class ProfileError(ValueError):
@@ -31,11 +41,11 @@ class ProfileError(ValueError):
 
 
 class ProfileNotFoundError(ProfileError):
-    pass
+    """Raised when a profile, source, or source query does not exist."""
 
 
 class ProfileConflictError(ProfileError):
-    pass
+    """Raised when a change collides with existing data, such as a duplicate."""
 
 
 @dataclass(frozen=True)
@@ -67,10 +77,7 @@ def list_profiles(session: Session) -> list[ProfileDetail]:
 
 
 def get_profile(session: Session, profile_id: int) -> ProfileDetail:
-    profile = session.get(Profile, profile_id)
-    if profile is None:
-        raise ProfileNotFoundError(f"profile {profile_id} was not found")
-    return _profile_detail(session, profile)
+    return _profile_detail(session, _get_profile_row(session, profile_id))
 
 
 def create_profile(
@@ -114,22 +121,24 @@ def create_profile(
 def update_profile(
     session: Session,
     profile_id: int,
-    **values,
+    *,
+    role_name: str,
+    salary_min: int,
+    match_threshold: int,
+    active: bool,
+    location_types: list[str],
+    keywords: list[str],
+    exclude_keywords: list[str],
 ) -> ProfileDetail:
-    detail = get_profile(session, profile_id)
-    profile = detail.profile
-    role_name = _required_text(values["role_name"], "role name")
-    salary_min = int(values["salary_min"])
-    match_threshold = int(values["match_threshold"])
+    profile = _get_profile_row(session, profile_id)
+    role_name = _required_text(role_name, "role name")
     _validate_profile_values(salary_min, match_threshold)
-    locations = _normalize_locations(values["location_types"])
-    included, excluded = _normalize_keyword_groups(
-        values["keywords"], values["exclude_keywords"]
-    )
+    locations = _normalize_locations(location_types)
+    included, excluded = _normalize_keyword_groups(keywords, exclude_keywords)
     profile.role_name = role_name
     profile.salary_min = salary_min
     profile.match_threshold = match_threshold
-    profile.active = bool(values["active"])
+    profile.active = active
     profile.updated_at = datetime.now()
     session.add(profile)
     try:
@@ -142,7 +151,7 @@ def update_profile(
 
 
 def delete_profile(session: Session, profile_id: int) -> None:
-    detail = get_profile(session, profile_id)
+    profile = _get_profile_row(session, profile_id)
     job_count = session.exec(
         select(func.count(Job.id)).where(Job.profile_id == profile_id)
     ).one()
@@ -157,7 +166,7 @@ def delete_profile(session: Session, profile_id: int) -> None:
         delete(ProfileLocationType).where(ProfileLocationType.profile_id == profile_id)
     )
     session.exec(delete(ProfileKeyword).where(ProfileKeyword.profile_id == profile_id))
-    session.delete(detail.profile)
+    session.delete(profile)
     session.commit()
 
 
@@ -168,7 +177,7 @@ def create_source_query(
     source_id: int,
     raw_query: dict,
 ) -> ProfileDetail:
-    get_profile(session, profile_id)
+    _get_profile_row(session, profile_id)
     source = _get_source(session, source_id)
     query_json = _validated_query_json(session, source, raw_query)
     _ensure_unique_query(session, profile_id, source_id, query_json)
@@ -223,7 +232,9 @@ def list_profile_runs_for_source(
     source_name: str,
 ) -> list[JobSourceRunContext]:
     source = session.exec(
-        select(Source).where(func.lower(Source.name) == source_name.strip().lower())
+        select(Source).where(
+            func.lower(Source.name) == normalize_source_name(source_name)
+        )
     ).first()
     if source is None:
         raise ProfileNotFoundError(f'source "{source_name}" was not found')
@@ -391,22 +402,35 @@ def _required_text(value: str, label: str) -> str:
     return value
 
 
+def _get_profile_row(session: Session, profile_id: int) -> Profile:
+    profile = session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError(f"profile {profile_id} was not found")
+    return profile
+
+
 def _get_source(session: Session, source_id: int) -> Source:
-    source = session.get(Source, source_id)
-    if source is None:
-        raise ProfileNotFoundError(f"source {source_id} was not found")
-    return source
+    try:
+        return get_source(session, source_id)
+    except SourceNotFoundError as error:
+        raise ProfileNotFoundError(str(error)) from error
+
+
+def _query_schema_for(source: Source) -> type[RemotiveProfileQuery]:
+    schema = SOURCE_QUERY_SCHEMAS.get(normalize_source_name(source.name))
+    if schema is None:
+        raise ProfileError(f'no query schema is registered for source "{source.name}"')
+    return schema
 
 
 def _parse_source_query(source: Source, query_json: str) -> RemotiveProfileQuery:
+    schema = _query_schema_for(source)
     try:
         raw_query = json.loads(query_json)
     except json.JSONDecodeError as error:
         raise ProfileError("source query contains malformed JSON") from error
-    if source.name.lower() != "remotive":
-        raise ProfileError(f'no query schema is registered for source "{source.name}"')
     try:
-        return RemotiveProfileQuery.model_validate(raw_query)
+        return schema.model_validate(raw_query)
     except ValidationError as error:
         raise ProfileError(_format_query_validation_error(error)) from error
 
@@ -423,12 +447,11 @@ def _validate_source_query_json(
 
 
 def _validated_query_json(session: Session, source: Source, raw_query: dict) -> str:
+    schema = _query_schema_for(source)
     try:
-        query = RemotiveProfileQuery.model_validate(raw_query)
+        query = schema.model_validate(raw_query)
     except ValidationError as error:
         raise ProfileError(_format_query_validation_error(error)) from error
-    if source.name.lower() != "remotive":
-        raise ProfileError(f'no query schema is registered for source "{source.name}"')
     _resolve_query_company(session, query)
     return query.model_dump_json(exclude_none=True)
 

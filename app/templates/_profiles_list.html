@@ -68,7 +68,7 @@
             <fieldset class="md:col-span-2">
               <legend class="label-text mb-1">Location types</legend>
               <div class="flex flex-wrap gap-4">
-                {% for value in ["remote", "hybrid", "onsite"] %}
+                {% for value in location_types %}
                   <label class="flex items-center gap-2">
                     <input
                       class="checkbox checkbox-sm"

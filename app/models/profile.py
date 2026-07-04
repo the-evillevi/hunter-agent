@@ -10,17 +10,23 @@ from sqlmodel import Field, SQLModel
 
 
 class LocationType(StrEnum):
+    """Work arrangements a profile can target; one profile may pick several."""
+
     remote = "remote"
     hybrid = "hybrid"
     onsite = "onsite"
 
 
 class KeywordKind(StrEnum):
+    """Whether a profile keyword should attract or filter out jobs."""
+
     include = "include"
     exclude = "exclude"
 
 
 class RemotiveCategory(StrEnum):
+    """The subset of Remotive job categories this project searches."""
+
     software_development = "software-development"
     artificial_intelligence = "artificial-intelligence"
     research = "research"

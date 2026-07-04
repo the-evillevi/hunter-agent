@@ -74,6 +74,22 @@ def test_profile_validation_rejects_duplicates_overlap_and_bad_values(
             keywords=["Python"],
             exclude_keywords=[],
         )
+    with pytest.raises(ProfileError, match="at least one keyword"):
+        create_profile(session, **common, keywords=[], exclude_keywords=[])
+    with pytest.raises(ProfileError, match="match threshold"):
+        create_profile(
+            session,
+            **{**common, "match_threshold": 101},
+            keywords=["Python"],
+            exclude_keywords=[],
+        )
+    with pytest.raises(ProfileError, match="salary"):
+        create_profile(
+            session,
+            **{**common, "salary_min": -1},
+            keywords=["Python"],
+            exclude_keywords=[],
+        )
 
 
 def test_profile_role_name_is_case_insensitively_unique(session: Session) -> None:
