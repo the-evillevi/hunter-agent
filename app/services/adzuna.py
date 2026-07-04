@@ -14,6 +14,7 @@ from app.services.sources import (
     JobSourceIdentity,
     JobSourceRunContext,
     NormalizedJob,
+    default_source_registry,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,14 +46,26 @@ class AdzunaJobSourceAdapter:
         """Fetch Adzuna pages and skip unusable records inside each page."""
         settings = self._settings_for_fetch()
         self._require_credentials(settings)
+        if self._client is not None:
+            return await self._fetch_pages(self._client, context, settings)
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            return await self._fetch_pages(client, context, settings)
+
+    async def _fetch_pages(
+        self,
+        client: httpx.AsyncClient,
+        context: JobSourceRunContext,
+        settings: AdzunaSourceConfig,
+    ) -> list[Mapping[str, Any]]:
+        params = _request_params(context, settings)
         accepted_jobs: list[Mapping[str, Any]] = []
         for page in range(1, settings.max_pages + 1):
-            response_payload = await self._get_json(
-                page, _request_params(context, settings), settings
-            )
+            response_payload = await self._get_json(client, page, params, settings)
             results = response_payload.get("results")
             if not isinstance(results, list):
-                raise AdzunaAdapterError("Adzuna response did not include a results list")
+                raise AdzunaAdapterError(
+                    "Adzuna response did not include a results list"
+                )
             if not results:
                 break
 
@@ -110,21 +123,17 @@ class AdzunaJobSourceAdapter:
 
     async def _get_json(
         self,
+        client: httpx.AsyncClient,
         page: int,
         params: dict[str, str],
         settings: AdzunaSourceConfig,
     ) -> Mapping[str, Any]:
+        url = f"{self._base_url}/{settings.country}/search/{page}"
         try:
-            url = f"{self._base_url}/{settings.country}/search/{page}"
-            if self._client is not None:
-                response = await self._client.get(url, params=params)
-                return _response_json(response)
-
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.get(url, params=params)
-                return _response_json(response)
+            response = await client.get(url, params=params)
         except httpx.RequestError as error:
             raise AdzunaAdapterError("Adzuna API request failed") from error
+        return _response_json(response)
 
     def _settings_for_fetch(self) -> AdzunaSourceConfig:
         return self._settings or load_config().sources.adzuna
@@ -261,3 +270,8 @@ def _job_label(payload: object) -> str:
     if not parts:
         return ""
     return " " + " ".join(parts)
+
+
+# Self-register so importing this module (which app.services.sources does at
+# its bottom) makes the adapter resolvable through the default registry.
+default_source_registry.register(AdzunaJobSourceAdapter())

@@ -38,9 +38,7 @@ def adzuna_settings(**overrides: object) -> AdzunaSourceConfig:
     return AdzunaSourceConfig.model_validate(values)
 
 
-def make_adzuna_client(
-    payload: object, *, status_code: int = 200
-) -> httpx.AsyncClient:
+def make_adzuna_client(payload: object, *, status_code: int = 200) -> httpx.AsyncClient:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(status_code, json=payload, request=request)
 
@@ -341,6 +339,26 @@ def test_default_registry_registers_adzuna_from_sources_import_only() -> None:
             sys.executable,
             "-c",
             (
+                "from app.services.sources import default_source_registry; "
+                "print(default_source_registry.resolve_selected(['adzuna'])[0]"
+                ".adapter.identity.display_name)"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "Adzuna"
+
+
+def test_adzuna_module_can_be_imported_before_sources() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import app.services.adzuna; "
                 "from app.services.sources import default_source_registry; "
                 "print(default_source_registry.resolve_selected(['adzuna'])[0]"
                 ".adapter.identity.display_name)"

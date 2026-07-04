@@ -288,9 +288,4 @@ default_source_registry = JobSourceRegistry()
 # at the bottom, after every name they need is defined; importing the module
 # object (not a name from it) keeps both import orders free of circular-import
 # errors.
-from app.services import remotive  # noqa: E402,F401
-
-from app.services.adzuna import AdzunaJobSourceAdapter  # noqa: E402
-
-
-default_source_registry.register(AdzunaJobSourceAdapter())
+from app.services import adzuna, remotive  # noqa: E402,F401
