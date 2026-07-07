@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Resumes</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            Master resumes imported from cvs/resume.json and their tailored
+            variants.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="btn btn-primary"
+          hx-get="/resumes/partials/list"
+          hx-target="#resumes-list"
+          hx-swap="innerHTML"
+        >
+          Refresh
+        </button>
+      </div>
+
+      <div id="resumes-list">{% include "_resumes_list.html" %}</div>
+    </div>
+  </section>
+{% endblock %}
