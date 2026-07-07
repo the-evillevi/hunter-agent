@@ -92,7 +92,7 @@ def _query_companies(
     )
 
 
-@router.get("/companies", response_class=HTMLResponse)
+@router.get("/companies", response_class=HTMLResponse, include_in_schema=False)
 def companies_page(
     request: Request,
     q: str | None = None,
@@ -160,8 +160,23 @@ def companies_table_partial(
 
 @router.post(
     "/api/companies/sp500/ingest",
+    tags=["Ingestion"],
+    summary="Run the S&P 500 company ingestion",
     response_model=Sp500IngestionSummary,
-    responses={409: {}, 500: {}, 502: {}},
+    responses={
+        409: {
+            "model": Sp500IngestionSummary,
+            "description": "No enabled S&P company source to run.",
+        },
+        500: {
+            "model": Sp500IngestionSummary,
+            "description": "Every selected source failed before persistence.",
+        },
+        502: {
+            "model": Sp500IngestionSummary,
+            "description": "An upstream provider returned unusable data.",
+        },
+    },
 )
 async def ingest_sp500_api(
     session: Session = Depends(get_session),
@@ -174,7 +189,11 @@ async def ingest_sp500_api(
     )
 
 
-@router.post("/companies/sp500/ingest", response_class=HTMLResponse)
+@router.post(
+    "/companies/sp500/ingest",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def ingest_sp500_partial(
     request: Request,
     session: Session = Depends(get_session),

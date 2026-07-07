@@ -30,7 +30,11 @@ def sources_list_partial(
     )
 
 
-@router.post("/sources/{source_id}/toggle", response_class=HTMLResponse)
+@router.post(
+    "/sources/{source_id}/toggle",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 def toggle_source(
     source_id: int,
     enabled: bool,
