@@ -259,6 +259,7 @@ CREATE TABLE resume_items (
     OR relevance_score BETWEEN 0 AND 100
   ),
   score_reasoning TEXT,
+  score_is_fallback BOOLEAN NOT NULL DEFAULT 0 CHECK (score_is_fallback IN (0, 1)),
   order_idx INTEGER NOT NULL DEFAULT 0
 );
 

@@ -109,6 +109,7 @@ def get_resume_detail(session: Session, resume_id: int) -> ResumeDetail | None:
                     content=item.content_dict(),
                     relevance_score=item.relevance_score,
                     score_reasoning=item.score_reasoning,
+                    score_is_fallback=item.score_is_fallback,
                     order_idx=item.order_idx,
                 )
                 for item in items_by_section.get(section.id, [])
@@ -167,12 +168,29 @@ def add_item(
     section_id: int,
     content: dict,
     order_idx: int = 0,
+    relevance_score: float | None = None,
+    score_reasoning: str | None = None,
+    score_is_fallback: bool = False,
 ) -> ResumeItem:
-    """Stage one JSON fact payload under a section; the caller commits."""
+    """Stage one JSON fact payload under a section; the caller commits.
+
+    Tailored variants pass the score fields so copied items carry the
+    judgement that selected them; master imports leave them at their
+    defaults. Validate the score here so a bad value raises a clear
+    ValueError instead of an IntegrityError from the database CHECK.
+    """
+    if relevance_score is not None and not 0 <= relevance_score <= 100:
+        raise ValueError(
+            f"Relevance score must be between 0 and 100, got {relevance_score}"
+        )
+
     item = ResumeItem(
         section_id=section_id,
         content=json.dumps(content, ensure_ascii=False),
         order_idx=order_idx,
+        relevance_score=relevance_score,
+        score_reasoning=score_reasoning,
+        score_is_fallback=score_is_fallback,
     )
     session.add(item)
     session.flush()

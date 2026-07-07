@@ -124,6 +124,9 @@ class ResumeItem(SQLModel, table=True):
     content: str
     relevance_score: float | None = None
     score_reasoning: str | None = None
+    # True when the score is a neutral placeholder because the scoring model
+    # was unavailable; the UI must not present it as a real judgement.
+    score_is_fallback: bool = False
     order_idx: int = 0
 
     def content_dict(self) -> dict:
@@ -205,6 +208,7 @@ class ResumeItemDetail(SQLModel):
     content: dict
     relevance_score: float | None
     score_reasoning: str | None
+    score_is_fallback: bool = False
     order_idx: int
 
 
