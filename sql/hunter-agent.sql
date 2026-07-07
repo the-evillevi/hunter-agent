@@ -4,6 +4,14 @@ PRAGMA foreign_keys = ON;
 
 BEGIN TRANSACTION;
 
+DROP TABLE IF EXISTS resume_tailor_runs;
+
+DROP TABLE IF EXISTS resume_items;
+
+DROP TABLE IF EXISTS resume_sections;
+
+DROP TABLE IF EXISTS resume_profiles;
+
 DROP TABLE IF EXISTS blacklist;
 
 DROP TABLE IF EXISTS applications;
@@ -201,5 +209,65 @@ CREATE TABLE blacklist (
     )
   )
 );
+
+-- Resume storage: structured CV facts instead of opaque file paths.
+-- A profile is one resume version; base_resume_id points at the master
+-- for tailored variants, and job_id marks which job a variant targets.
+CREATE TABLE resume_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  base_resume_id INTEGER REFERENCES resume_profiles (id),
+  job_id INTEGER REFERENCES jobs (id),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE resume_sections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
+  section_type TEXT NOT NULL CHECK (
+    section_type IN (
+      'basics',
+      'summary',
+      'experience',
+      'education',
+      'skills',
+      'projects',
+      'certifications'
+    )
+  ),
+  title TEXT NOT NULL,
+  order_idx INTEGER NOT NULL DEFAULT 0
+);
+
+-- content holds the JSON-encoded fact payload (company, dates, bullets, ...)
+-- so new fact shapes never require a schema migration. relevance_score and
+-- score_reasoning stay NULL until a tailoring run scores the item.
+CREATE TABLE resume_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  section_id INTEGER NOT NULL REFERENCES resume_sections (id),
+  content TEXT NOT NULL,
+  relevance_score REAL CHECK (
+    relevance_score IS NULL
+    OR relevance_score BETWEEN 0 AND 100
+  ),
+  score_reasoning TEXT,
+  order_idx INTEGER NOT NULL DEFAULT 0
+);
+
+-- Audit log: one row per tailoring run that produced a variant for a job.
+CREATE TABLE resume_tailor_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
+  output_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
+  job_id INTEGER NOT NULL REFERENCES jobs (id),
+  model TEXT NOT NULL,
+  prompt_version TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_resume_sections_profile ON resume_sections (profile_id);
+
+CREATE INDEX idx_resume_items_section ON resume_items (section_id);
 
 COMMIT;

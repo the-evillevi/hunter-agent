@@ -24,6 +24,11 @@ from app.models.location import Location
 from app.models.profile import Profile
 from app.models.source import Source
 
+# Imported for their side effect: registering the resume tables on
+# SQLModel.metadata so every test database includes them, even when the
+# resume test modules are not part of the collected test run.
+from app.models import resume as _resume_models  # noqa: F401
+
 
 @pytest.fixture()
 def engine(tmp_path) -> Iterator[Engine]:

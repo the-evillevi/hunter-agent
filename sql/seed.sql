@@ -587,6 +587,34 @@ INSERT INTO jobs (id, profile_id, title, company_id, location_id, url, source_id
 -- applications
 INSERT INTO applications (id, job_id, cv_path, status, applied_at, last_updated, notes) VALUES (1, 1, '/Users/evillevi/cv/master.docx', 'pending', NULL, '2026-06-18 23:08:34', 'Tailor CV to highlight PyTorch and LLM experience. Prepare brief note about previous work with recommendation systems.');
 
+-- Resume profiles: one master resume with a couple of representative facts.
+-- The full master resume is imported from cvs/resume.json via
+-- `uv run python -m app.services.resume_import`.
+INSERT INTO resume_profiles (name, created_at, updated_at)
+VALUES ('seed-master', datetime('now'), datetime('now'));
+
+INSERT INTO resume_sections (profile_id, section_type, title, order_idx)
+VALUES (1, 'experience', 'Work Experience', 0);
+
+INSERT INTO resume_sections (profile_id, section_type, title, order_idx)
+VALUES (1, 'skills', 'Technical Skills', 1);
+
+INSERT INTO resume_items (section_id, content, order_idx)
+VALUES (
+    1,
+    '{"position": "Application Developer", "company": "IBM", "highlights": ["Designed and implemented automated ETL workflows."]}',
+    0
+);
+
+INSERT INTO resume_items (section_id, content, relevance_score, score_reasoning, order_idx)
+VALUES (
+    2,
+    '{"category": "Languages", "keywords": ["Python", "TypeScript"]}',
+    90,
+    'Seed example of a scored item.',
+    0
+);
+
 -- blacklist
 INSERT INTO blacklist (id, company_id, job_id, reason, added_at) VALUES (1, 1, NULL, 'Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.', '2026-06-18 23:08:34');
 

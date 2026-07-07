@@ -1,0 +1,68 @@
+{
+  "name": "sample",
+  "basics": {
+    "name": "Sample Person",
+    "label": "Software Engineer",
+    "email": "sample@example.test",
+    "profiles": []
+  },
+  "sections": [
+    {
+      "type": "summary",
+      "title": "Professional Summary",
+      "items": [
+        { "text": "Engineer with test-fixture experience.", "source": "v11" }
+      ]
+    },
+    {
+      "type": "experience",
+      "title": "Work Experience",
+      "items": [
+        {
+          "position": "Application Developer",
+          "company": "IBM",
+          "start_date": "2023-10",
+          "end_date": null,
+          "location": "Remote",
+          "highlights": [
+            "Designed and implemented automated ETL workflows.",
+            "Built BigQuery automations to streamline data ingestion."
+          ],
+          "source": "v10+v11"
+        },
+        {
+          "position": "Software Developer",
+          "company": "Oracle",
+          "start_date": "2021-05",
+          "end_date": "2022-04",
+          "location": "Remote",
+          "highlights": ["Implemented automated testing with Jenkins."],
+          "source": "v10+v11"
+        }
+      ]
+    },
+    {
+      "type": "skills",
+      "title": "Technical Skills",
+      "items": [
+        {
+          "category": "Languages",
+          "keywords": ["Python", "TypeScript"],
+          "detail": "Python, TypeScript (5 yrs)",
+          "source": "v10"
+        }
+      ]
+    },
+    {
+      "type": "education",
+      "title": "Education",
+      "items": [
+        {
+          "degree": "Bachelor's Degree in Computer Systems Engineering",
+          "institution": "Tecnológico de Monterrey",
+          "source": "v11"
+        }
+      ]
+    }
+  ]
+}
