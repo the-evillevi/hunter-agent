@@ -17,6 +17,7 @@ dependencies = [
     "ruff>=0.15.15",
     "sqlmodel>=0.0.38",
     "uvicorn>=0.48.0",
+    "weasyprint>=69.0",
 ]
 
 [tool.pytest.ini_options]
