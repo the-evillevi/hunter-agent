@@ -58,6 +58,7 @@ class LlmScoreResult(ScoreLayerResult):
 
     model: str
     prompt_version: str
+    duration_ms: int = Field(ge=0)
     attempts: int = Field(ge=1)
     guard_flag_codes: tuple[str, ...]
 

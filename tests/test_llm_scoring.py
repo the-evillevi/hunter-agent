@@ -101,11 +101,13 @@ def test_prompt_fences_job_text_and_keeps_profile_trusted(
 
     run_layer(provider, profile)
 
-    prompt = provider.requests[0].prompt
-    assert "<<<UNTRUSTED:job_title:BEGIN>>>" in prompt
-    assert "<<<UNTRUSTED:job_description:BEGIN>>>" in prompt
-    # Profile facts live in the trusted section, before any fenced text.
-    assert prompt.index("Python, FastAPI") < prompt.index("<<<UNTRUSTED")
+    request = provider.requests[0]
+    assert "<<<UNTRUSTED:job_title:BEGIN>>>" in request.prompt
+    assert "<<<UNTRUSTED:job_description:BEGIN>>>" in request.prompt
+    # Profile facts ride the trusted system role, never the user message.
+    assert request.system_prompt is not None
+    assert "Python, FastAPI" in request.system_prompt
+    assert "Python, FastAPI" not in request.prompt
 
 
 def test_oversized_job_text_is_bounded_by_the_guard(
@@ -176,6 +178,27 @@ def test_injection_attempt_surfaces_guard_flag_codes(
     result = asyncio.run(LlmScoreLayer(provider).score(job, make_profile()))
 
     assert "instruction_override" in result.guard_flag_codes
+
+
+def test_job_without_text_skips_the_llm_layer(make_profile: MakeProfile) -> None:
+    provider = FakeCompletionProvider([VALID_REPLY])
+
+    with pytest.raises(ScoreLayerUnavailableError):
+        asyncio.run(
+            LlmScoreLayer(provider).score(
+                ScoreJobInput(title=None, description=None), make_profile()
+            )
+        )
+
+    assert provider.requests == []
+
+
+def test_result_retains_model_call_duration(make_profile: MakeProfile) -> None:
+    provider = FakeCompletionProvider([VALID_REPLY])
+
+    result = run_layer(provider, make_profile())
+
+    assert result.duration_ms == 5
 
 
 def test_pipeline_records_failure_and_keeps_deterministic_score(

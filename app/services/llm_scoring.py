@@ -17,7 +17,11 @@ from app.models.config import ProfileConfig
 from app.models.scoring import LlmScoreResult
 from app.services.ai.completion import CompletionProvider, CompletionRequest
 from app.services.ai.errors import AIProviderError
-from app.services.prompt_guard import build_guarded_payload, guard_untrusted_text
+from app.services.prompt_guard import (
+    GuardedPayload,
+    build_guarded_payload,
+    guard_untrusted_text,
+)
 from app.services.scoring_pipeline import ScoreJobInput, ScoreLayerUnavailableError
 
 
@@ -52,6 +56,15 @@ class LlmScorePayload(BaseModel):
 
     score: int = Field(ge=0, le=100)
     reasoning: str = Field(min_length=1)
+
+
+# The schema is static; computing it once keeps the retry loop free of
+# repeated work and gives tests one canonical object to assert against.
+LLM_RESPONSE_SCHEMA = LlmScorePayload.model_json_schema()
+
+# Validation errors can enumerate many constraint failures; bound what the
+# failure diagnostics retain, matching the pipeline's failure-detail cap.
+MAX_ERROR_DETAIL_CHARS = 500
 
 
 class LlmScoreFailedError(Exception):
@@ -95,15 +108,27 @@ class LlmScoreLayer:
         profile: ProfileConfig,
     ) -> LlmScoreResult:
         """Ask the model for a structured score over guarded job text."""
+        if not job.title and not job.description:
+            # Nothing to score: asking the model about an empty listing
+            # wastes a call and invites hallucinated reasoning.
+            raise ScoreLayerUnavailableError(
+                "job has no text to score", code="no_input_text"
+            )
+
         payload = self._build_payload(job, profile)
-        prompt = payload.render_prompt()
+        # Role separation beats position-in-string: trusted instructions
+        # ride the system role, fenced job text rides the user role.
+        untrusted_prompt = payload.render_untrusted()
         guard_flag_codes = tuple(flag.code for flag in payload.flags)
 
         last_error = "no attempts made"
         for attempt in range(1, MAX_ATTEMPTS + 1):
             request = CompletionRequest(
-                prompt=prompt if attempt == 1 else prompt + REPAIR_NOTE,
-                response_schema=LlmScorePayload.model_json_schema(),
+                system_prompt=payload.instructions,
+                prompt=(
+                    untrusted_prompt if attempt == 1 else untrusted_prompt + REPAIR_NOTE
+                ),
+                response_schema=LLM_RESPONSE_SCHEMA,
             )
             try:
                 response = await self._provider.complete(request)
@@ -117,7 +142,7 @@ class LlmScoreLayer:
             try:
                 parsed = LlmScorePayload.model_validate_json(response.text)
             except ValidationError as error:
-                last_error = str(error)
+                last_error = str(error)[:MAX_ERROR_DETAIL_CHARS]
                 continue
 
             return LlmScoreResult(
@@ -127,6 +152,7 @@ class LlmScoreLayer:
                 explanation=parsed.reasoning,
                 model=response.model,
                 prompt_version=LLM_PROMPT_VERSION,
+                duration_ms=response.duration_ms,
                 attempts=attempt,
                 guard_flag_codes=guard_flag_codes,
             )
@@ -138,7 +164,11 @@ class LlmScoreLayer:
             attempts=MAX_ATTEMPTS,
         )
 
-    def _build_payload(self, job: ScoreJobInput, profile: ProfileConfig):
+    def _build_payload(
+        self,
+        job: ScoreJobInput,
+        profile: ProfileConfig,
+    ) -> GuardedPayload:
         """Compose trusted instructions with guarded job text.
 
         Profile data comes from validated local config, so it belongs in
