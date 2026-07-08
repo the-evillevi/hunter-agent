@@ -53,6 +53,15 @@ class SemanticScoreResult(ScoreLayerResult):
     similarity: float = Field(ge=-1, le=1, allow_inf_nan=False)
 
 
+class LlmScoreResult(ScoreLayerResult):
+    """LLM-layer result keeping model, prompt, and safety audit metadata."""
+
+    model: str
+    prompt_version: str
+    attempts: int = Field(ge=1)
+    guard_flag_codes: tuple[str, ...]
+
+
 class LayerOutcome(BaseModel):
     """What happened to one registered layer during a pipeline run.
 
