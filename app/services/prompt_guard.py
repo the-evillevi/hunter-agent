@@ -133,23 +133,38 @@ def guard_untrusted_text(
     original_length = len(text)
     bounded = text[:max_chars]
 
-    flags = tuple(
-        SuspicionFlag(
-            code=code,
-            section_label=label,
-            excerpt=match.group(0)[:MAX_FLAG_EXCERPT_CHARS],
-        )
-        for code, pattern in SUSPICION_PATTERNS.items()
-        if (match := pattern.search(bounded)) is not None
-    )
+    flags: list[SuspicionFlag] = []
+    for code, pattern in SUSPICION_PATTERNS.items():
+        match = pattern.search(bounded)
+        if match is not None:
+            flags.append(
+                SuspicionFlag(
+                    code=code,
+                    section_label=label,
+                    excerpt=match.group(0)[:MAX_FLAG_EXCERPT_CHARS],
+                )
+            )
 
     return GuardedSection(
         label=label,
-        text=bounded.replace(DELIMITER_TOKEN, NEUTRALIZED_DELIMITER),
+        text=_neutralize_delimiters(bounded),
         truncated=original_length > max_chars,
         original_length=original_length,
-        flags=flags,
+        flags=tuple(flags),
     )
+
+
+def _neutralize_delimiters(text: str) -> str:
+    """Break every marker prefix apart, even ones a single pass would re-form.
+
+    A one-shot replace is not enough: six consecutive "<" characters turn
+    into "<< <<< <", which contains the marker prefix again. Repeating the
+    replacement always terminates because each pass strictly reduces the
+    number of "<<<" occurrences.
+    """
+    while DELIMITER_TOKEN in text:
+        text = text.replace(DELIMITER_TOKEN, NEUTRALIZED_DELIMITER)
+    return text
 
 
 def build_guarded_payload(
