@@ -7,7 +7,7 @@ live Ollama server or any network access.
 
 import asyncio
 import json
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 import pytest
@@ -50,11 +50,11 @@ def ollama_body(**overrides: Any) -> dict[str, Any]:
 
 def make_provider(
     handler: httpx.MockTransport,
-    role: str = "scorer",
+    role: Literal["scorer", "tailor"] = "scorer",
 ) -> OllamaCompletionProvider:
     return OllamaCompletionProvider(
         make_ollama_config(),
-        role,  # type: ignore[arg-type]
+        role,
         transport=handler,
     )
 
@@ -186,6 +186,13 @@ def test_non_json_body_maps_to_response_error() -> None:
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, text="not json at all")
     )
+
+    with pytest.raises(AIResponseError):
+        asyncio.run(make_provider(transport).complete(CompletionRequest(prompt="hi")))
+
+
+def test_non_object_json_body_maps_to_response_error() -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=[1, 2, 3]))
 
     with pytest.raises(AIResponseError):
         asyncio.run(make_provider(transport).complete(CompletionRequest(prompt="hi")))

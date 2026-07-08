@@ -148,6 +148,13 @@ class OllamaCompletionProvider:
                 model=self.model,
             ) from error
 
+        if not isinstance(body, dict):
+            raise AIResponseError(
+                "Ollama returned JSON that is not an object",
+                provider=self.provider_name,
+                model=self.model,
+            )
+
         message = body.get("message")
         if not isinstance(message, dict) or not isinstance(message.get("content"), str):
             raise AIResponseError(
