@@ -14,7 +14,7 @@ import hashlib
 import math
 
 from app.models.config import ProfileConfig
-from app.models.scoring import ScoreLayerResult
+from app.models.scoring import SemanticScoreResult
 from app.services.ai.embeddings import OllamaEmbeddingsClient
 from app.services.ai.errors import AIProviderError
 from app.services.scoring_pipeline import ScoreJobInput, ScoreLayerUnavailableError
@@ -29,13 +29,6 @@ SEMANTIC_ALGORITHM_VERSION = "1"
 # nomic-embed-text context window also caps what is useful to send.
 MAX_JOB_CHARS = 4000
 MAX_PROFILE_CHARS = 1000
-
-
-class SemanticScoreResult(ScoreLayerResult):
-    """Semantic layer result keeping model identity and the raw similarity."""
-
-    model: str
-    similarity: float
 
 
 def build_job_text(title: str | None, description: str | None) -> str:
@@ -61,7 +54,12 @@ def cosine_similarity(a: tuple[float, ...], b: tuple[float, ...]) -> float:
     norm_b = math.sqrt(sum(y * y for y in b))
     if norm_a == 0 or norm_b == 0:
         return 0.0
-    return dot / (norm_a * norm_b)
+    similarity = dot / (norm_a * norm_b)
+    # Non-finite vector values (JSON permits Infinity) must not leak a NaN
+    # into score math, where comparisons silently misbehave.
+    if not math.isfinite(similarity):
+        return 0.0
+    return similarity
 
 
 def similarity_to_score(similarity: float) -> int:
@@ -102,6 +100,13 @@ class SemanticScoreLayer:
         job_text = build_job_text(job.title, job.description)
         profile_text = build_profile_text(profile)
 
+        if not job_text:
+            # Nothing to embed: similarity against an empty string would be
+            # noise, so this job explicitly skips the semantic layer.
+            raise ScoreLayerUnavailableError(
+                "job has no text to embed", code="no_input_text"
+            )
+
         try:
             job_vector = await self._embed_cached(job_text)
             profile_vector = await self._embed_cached(profile_text)
@@ -111,6 +116,14 @@ class SemanticScoreLayer:
             raise ScoreLayerUnavailableError(
                 f"semantic layer unavailable: {error}"
             ) from error
+
+        if len(job_vector) != len(profile_vector):
+            # Same model must yield same dimensions; a mismatch means the
+            # server returned inconsistent data, not that this job is bad.
+            raise ScoreLayerUnavailableError(
+                "embedding dimensions differ between job and profile",
+                code="malformed_embeddings",
+            )
 
         similarity = cosine_similarity(job_vector, profile_vector)
         score = similarity_to_score(similarity)

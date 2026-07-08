@@ -46,6 +46,13 @@ class KeywordScoreResult(ScoreLayerResult):
     excluded_terms_found: tuple[str, ...]
 
 
+class SemanticScoreResult(ScoreLayerResult):
+    """Semantic-layer result keeping model identity and the raw similarity."""
+
+    model: str
+    similarity: float
+
+
 class LayerOutcome(BaseModel):
     """What happened to one registered layer during a pipeline run.
 

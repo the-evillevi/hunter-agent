@@ -12,12 +12,8 @@ import json
 
 import httpx
 
-from app.services.ai.errors import (
-    AIConnectError,
-    AIHTTPError,
-    AIResponseError,
-    AITimeoutError,
-)
+from app.services.ai.errors import AIResponseError
+from app.services.ai.http import post_json
 
 
 PROVIDER_NAME = "ollama"
@@ -51,36 +47,14 @@ class OllamaEmbeddingsClient:
 
     async def embed(self, texts: list[str]) -> list[tuple[float, ...]]:
         """Return one embedding vector per input text, in input order."""
-        try:
-            async with httpx.AsyncClient(
-                transport=self._transport,
-                timeout=self._timeout_seconds,
-            ) as client:
-                response = await client.post(
-                    f"{self._base_url}/api/embed",
-                    json={"model": self.model, "input": texts},
-                )
-        except httpx.TimeoutException as error:
-            raise AITimeoutError(
-                f"Ollama embeddings timed out after {self._timeout_seconds}s: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
-        except httpx.TransportError as error:
-            raise AIConnectError(
-                f"could not reach Ollama at {self._base_url}: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
-
-        if response.status_code >= 400:
-            raise AIHTTPError(
-                f"Ollama embeddings returned HTTP {response.status_code}",
-                provider=self.provider_name,
-                model=self.model,
-                status_code=response.status_code,
-            )
-
+        response = await post_json(
+            f"{self._base_url}/api/embed",
+            {"model": self.model, "input": texts},
+            provider=self.provider_name,
+            model=self.model,
+            timeout_seconds=self._timeout_seconds,
+            transport=self._transport,
+        )
         return self._parse_response(response, expected_count=len(texts))
 
     def _parse_response(
@@ -115,5 +89,12 @@ class OllamaEmbeddingsClient:
                     provider=self.provider_name,
                     model=self.model,
                 )
-            vectors.append(tuple(float(value) for value in vector))
+            try:
+                vectors.append(tuple(float(value) for value in vector))
+            except (TypeError, ValueError) as error:
+                raise AIResponseError(
+                    "Ollama embeddings returned non-numeric vector values",
+                    provider=self.provider_name,
+                    model=self.model,
+                ) from error
         return vectors

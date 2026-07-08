@@ -19,6 +19,7 @@ from app.services.scoring_pipeline import (
     ScoreLayerUnavailableError,
     score_job,
 )
+from app.models.scoring import SemanticScoreResult
 from app.services.semantic_scoring import (
     MAX_JOB_CHARS,
     SemanticScoreLayer,
@@ -163,6 +164,53 @@ def test_pipeline_still_scores_when_semantic_layer_is_down(
     assert result.status == "scored"
     assert result.score == 100  # keyword layer alone, renormalized
     assert result.layer_outcomes[1].status == "skip"
+
+
+def test_job_without_text_skips_the_semantic_layer(
+    make_profile: MakeProfile,
+) -> None:
+    layer = make_layer(FakeEmbeddingsClient())
+
+    with pytest.raises(ScoreLayerUnavailableError):
+        asyncio.run(
+            layer.score(ScoreJobInput(title=None, description=None), make_profile())
+        )
+
+
+def test_mismatched_embedding_dimensions_skip_instead_of_crashing(
+    make_profile: MakeProfile,
+) -> None:
+    profile = make_profile()
+    client = FakeEmbeddingsClient(
+        vectors={build_profile_text(profile): (1.0, 0.0, 0.0)},
+        default=(1.0, 0.0),
+    )
+
+    with pytest.raises(ScoreLayerUnavailableError):
+        run_score(make_layer(client), profile)
+
+
+def test_non_finite_vector_values_score_0_not_100(
+    make_profile: MakeProfile,
+) -> None:
+    profile = make_profile()
+    infinity = float("inf")
+    client = FakeEmbeddingsClient(
+        vectors={build_profile_text(profile): (infinity, 1.0)},
+        default=(infinity, 2.0),
+    )
+
+    result = run_score(make_layer(client), profile)
+
+    assert result.score == 0
+
+
+def test_result_type_lives_in_the_shared_models_module(
+    make_profile: MakeProfile,
+) -> None:
+    result = run_score(make_layer(FakeEmbeddingsClient()), make_profile())
+
+    assert isinstance(result, SemanticScoreResult)
 
 
 def test_identical_inputs_produce_identical_results(make_profile: MakeProfile) -> None:
