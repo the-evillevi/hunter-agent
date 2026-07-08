@@ -70,11 +70,13 @@ class JobScoreResult(BaseModel):
     Rejected jobs carry the eligibility decision and no layer work; scored
     jobs carry a bounded aggregate plus every per-layer outcome so UI and
     persistence callers never need to re-run scoring to explain a number.
+    A failed run means eligibility passed but no score layer succeeded, so
+    no aggregate exists — that is different from legitimately scoring 0.
     """
 
     model_config = ConfigDict(frozen=True)
 
-    status: Literal["rejected", "scored"]
+    status: Literal["rejected", "scored", "failed"]
     eligibility: EligibilityResult
     score: int | None = Field(default=None, ge=0, le=100)
     layer_outcomes: tuple[LayerOutcome, ...] = ()

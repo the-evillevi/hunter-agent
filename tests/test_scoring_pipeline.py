@@ -207,6 +207,35 @@ def test_result_carries_pipeline_and_weights_versions(
     assert result.weights_version == WEIGHTS_VERSION
 
 
+def test_no_successful_layers_returns_failed_result_not_zero_score(
+    make_profile: MakeProfile,
+) -> None:
+    registry = ScoreLayerRegistry()
+    registry.register(
+        FakeScoreLayer("semantic", error=ScoreLayerUnavailableError("down")),
+        weight=1.0,
+        required=False,
+    )
+
+    result = asyncio.run(score_job(python_job(), make_profile(), registry=registry))
+
+    assert result.status == "failed"
+    assert result.score is None
+    assert result.layer_outcomes[0].status == "skip"
+    assert "No score layers succeeded" in result.explanation
+
+
+def test_warnings_stay_out_of_the_explanation_text(make_profile: MakeProfile) -> None:
+    profile = make_profile(salary_min=90000)
+    registry = make_registry()
+
+    result = asyncio.run(score_job(python_job(), profile, registry=registry))
+
+    assert result.warnings
+    assert "salary" not in result.explanation
+    assert result.explanation.startswith("keyword:")
+
+
 def test_duplicate_layer_names_are_rejected() -> None:
     registry = ScoreLayerRegistry()
     registry.register(FakeScoreLayer("semantic"), weight=1.0)

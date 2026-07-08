@@ -176,10 +176,11 @@ async def score_job(
             weights_version=WEIGHTS_VERSION,
         )
 
+    entries = registry.resolve()
     outcomes: list[LayerOutcome] = []
     warnings = list(unknown_warnings)
 
-    for entry in registry.resolve():
+    for entry in entries:
         outcome = await _run_layer(entry, job, profile)
         outcomes.append(outcome)
         if outcome.status == "skip":
@@ -187,15 +188,32 @@ async def score_job(
         elif outcome.status == "failure":
             warnings.append(f"layer {outcome.layer} failed: {outcome.failure_detail}")
 
-    aggregate = _aggregate_score(outcomes, registry)
-    explanation_parts = [
-        f"{outcome.layer}: {outcome.result.explanation}"
+    # Warnings stay structured on their own field; the explanation only
+    # narrates successful layer results, so callers never parse one out of
+    # the other. At least one successful layer is required to emit a score:
+    # a zero from "nothing ran" would be indistinguishable from a real 0.
+    successes = [
+        outcome
         for outcome in outcomes
         if outcome.status == "success" and outcome.result is not None
     ]
-    explanation = "; ".join(explanation_parts)
-    if warnings:
-        explanation += f" [warnings: {'; '.join(warnings)}]"
+    if not successes:
+        return JobScoreResult(
+            status="failed",
+            eligibility=eligibility,
+            layer_outcomes=tuple(outcomes),
+            warnings=tuple(warnings),
+            explanation="No score layers succeeded, so no aggregate score exists",
+            pipeline_version=PIPELINE_VERSION,
+            weights_version=WEIGHTS_VERSION,
+        )
+
+    aggregate = _aggregate_score(outcomes, entries)
+    explanation = "; ".join(
+        f"{outcome.layer}: {outcome.result.explanation}"
+        for outcome in successes
+        if outcome.result is not None
+    )
 
     return JobScoreResult(
         status="scored",
@@ -253,14 +271,15 @@ async def _run_layer(
 
 def _aggregate_score(
     outcomes: list[LayerOutcome],
-    registry: ScoreLayerRegistry,
+    entries: list[RegisteredScoreLayer],
 ) -> int:
     """Combine successful layer scores into one bounded weighted mean.
 
     Weights are renormalized over the layers that actually succeeded, so
     the aggregate stays comparable whether or not optional layers ran.
+    The caller guarantees at least one successful outcome exists.
     """
-    weights_by_name = {entry.layer.name: entry.weight for entry in registry.resolve()}
+    weights_by_name = {entry.layer.name: entry.weight for entry in entries}
     weighted_sum = 0.0
     weight_total = 0.0
     for outcome in outcomes:
@@ -270,8 +289,6 @@ def _aggregate_score(
         weighted_sum += weight * outcome.result.score
         weight_total += weight
 
-    if weight_total == 0:
-        return 0
     return min(100, max(0, round(weighted_sum / weight_total)))
 
 
