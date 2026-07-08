@@ -19,6 +19,7 @@ from app.db.database import get_session
 from app.main import app
 from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
+from app.models.config import ProfileConfig
 from app.models.job import Job
 from app.models.location import Location
 from app.models.profile import Profile
@@ -28,6 +29,34 @@ from app.models.source import Source
 # SQLModel.metadata so every test database includes them, even when the
 # resume test modules are not part of the collected test run.
 from app.models import resume as _resume_models  # noqa: F401
+
+
+@pytest.fixture()
+def make_profile() -> Callable[..., ProfileConfig]:
+    """Build a minimal valid config profile for scoring and eligibility tests.
+
+    Shared here so every scoring-related test module constructs profiles the
+    same way and only overrides the fields it cares about.
+    """
+
+    def _make_profile(
+        *,
+        keywords: list[str] | None = None,
+        exclude_keywords: list[str] | None = None,
+        salary_min: int = 0,
+        location_type: str | list[str] = "remote",
+    ) -> ProfileConfig:
+        return ProfileConfig(
+            role_name="Test Role",
+            active=True,
+            match_threshold=80,
+            salary_min=salary_min,
+            location_type=location_type,
+            keywords=keywords or ["Python"],
+            exclude_keywords=exclude_keywords or [],
+        )
+
+    return _make_profile
 
 
 @pytest.fixture()

@@ -41,18 +41,21 @@ def allowed_location_types(profile: ProfileConfig) -> frozenset[str]:
 def infer_location_type(location: str | None) -> str | None:
     """Read a location type out of a free-text location name, if it names one.
 
-    Returns None when the text names no type ("CDMX") or is ambiguous
-    ("hybrid or remote") — the caller must treat None as unknown, never as
-    a match or a mismatch.
+    Returns None when the text is missing, names no type ("CDMX"), or is
+    ambiguous ("hybrid or remote") — the caller must treat None as unknown,
+    never as a match or a mismatch.
     """
+    if not location:
+        return None
+
     index = FieldIndex(location)
-    inferred = {
+    inferred = [
         location_type
         for location_type, phrases in LOCATION_TYPE_PHRASES.items()
         if any(index.contains(phrase) for phrase in phrases)
-    }
+    ]
     if len(inferred) == 1:
-        return next(iter(inferred))
+        return inferred[0]
     return None
 
 
