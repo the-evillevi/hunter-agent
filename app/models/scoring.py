@@ -9,7 +9,7 @@ job shapes are defined once and consumed by services.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, Field, model_validator, SerializeAsAny
 
 from app.models.eligibility import EligibilityResult
 
@@ -80,6 +80,13 @@ class LayerOutcome(BaseModel):
     failure_code: str | None = None
     failure_detail: str | None = None
 
+    @model_validator(mode="after")
+    def success_must_carry_a_result(self) -> "LayerOutcome":
+        """A success outcome without a result would persist as a hollow row."""
+        if self.status == "success" and self.result is None:
+            raise ValueError("a successful layer outcome must include its result")
+        return self
+
 
 class JobScoreResult(BaseModel):
     """One job's complete, explainable scoring outcome for one profile.
@@ -101,3 +108,20 @@ class JobScoreResult(BaseModel):
     explanation: str
     pipeline_version: str
     weights_version: str
+
+    @model_validator(mode="after")
+    def status_and_score_must_agree(self) -> "JobScoreResult":
+        """Scored means a real aggregate exists; anything else means none does.
+
+        This is the invariant persistence relies on: a scored run always
+        caches a numeric aggregate, and a rejected or failed run never
+        writes one.
+        """
+        if self.status == "scored":
+            if self.score is None:
+                raise ValueError("a scored result must carry an aggregate score")
+            if not self.layer_outcomes:
+                raise ValueError("a scored result must carry its layer outcomes")
+        elif self.score is not None:
+            raise ValueError("only scored results may carry an aggregate score")
+        return self

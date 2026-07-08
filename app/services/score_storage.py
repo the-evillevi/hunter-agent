@@ -17,10 +17,9 @@ from app.models.job import Job
 from app.models.score_run import ScoreLayerResultRow, ScoreRun
 from app.models.scoring import JobScoreResult, LayerOutcome
 
-
-# Bounded failure text keeps rows auditable without storing unbounded
-# model output; matches the pipeline's own failure-detail cap.
-MAX_FAILURE_DETAIL_CHARS = 500
+# The pipeline already bounds failure detail; re-truncating here with the
+# same shared cap is defense in depth for rows written by future callers.
+from app.services.scoring_pipeline import MAX_FAILURE_DETAIL_CHARS
 
 
 def save_score_run(
@@ -52,10 +51,7 @@ def save_score_run(
         score=result.score,
         explanation=result.explanation,
         eligibility_reasons=json.dumps(
-            [
-                {"code": reason.code.value, "detail": reason.detail}
-                for reason in result.eligibility.reasons
-            ]
+            [reason.model_dump(mode="json") for reason in result.eligibility.reasons]
         ),
         unknowns=json.dumps([unknown.value for unknown in result.eligibility.unknowns]),
         warnings=json.dumps(list(result.warnings)),
@@ -66,9 +62,12 @@ def save_score_run(
         # Flush assigns the run id for the layer rows without committing
         # yet, keeping the whole write inside one transaction.
         session.flush()
+        if run.id is None:  # pragma: no cover - flush always assigns the PK
+            raise RuntimeError("score run id missing after flush")
 
-        for outcome in result.layer_outcomes:
-            session.add(_layer_row(run.id, outcome))
+        session.add_all(
+            _layer_row(run.id, outcome) for outcome in result.layer_outcomes
+        )
 
         if result.status == "scored":
             job.score = result.score
@@ -106,7 +105,7 @@ def latest_score_run(
     return session.exec(statement).first()
 
 
-def _layer_row(score_run_id: int | None, outcome: LayerOutcome) -> ScoreLayerResultRow:
+def _layer_row(score_run_id: int, outcome: LayerOutcome) -> ScoreLayerResultRow:
     """Translate one pipeline LayerOutcome into its persistence row.
 
     Layer-specific extras (model, prompt_version) are read defensively via
@@ -114,7 +113,7 @@ def _layer_row(score_run_id: int | None, outcome: LayerOutcome) -> ScoreLayerRes
     """
     layer_result = outcome.result
     return ScoreLayerResultRow(
-        score_run_id=score_run_id if score_run_id is not None else 0,
+        score_run_id=score_run_id,
         layer=outcome.layer,
         status=outcome.status,
         algorithm_version=(

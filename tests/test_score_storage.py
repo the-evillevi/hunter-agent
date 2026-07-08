@@ -308,3 +308,35 @@ def test_failed_run_is_persisted_without_touching_cache(
     assert run.score is None
     session.refresh(job)
     assert job.score == 55
+
+
+def test_sql_schema_replays_and_accepts_a_zero_score() -> None:
+    """The recreatable SQL script must accept the widened 0-100 score range."""
+    import sqlite3
+    from pathlib import Path
+
+    schema = Path("sql/hunter-agent.sql").read_text()
+    with sqlite3.connect(":memory:") as connection:
+        connection.execute("PRAGMA foreign_keys = ON")
+        connection.executescript(schema)
+        connection.execute(
+            "INSERT INTO profiles (role_name, salary_min, location_type,"
+            " match_threshold, active) VALUES ('Role', 0, 'remote', 80, 1)"
+        )
+        connection.execute("INSERT INTO companies (name) VALUES ('ACME')")
+        connection.execute("INSERT INTO locations (name) VALUES ('Remote')")
+        connection.execute("INSERT INTO sources (name) VALUES ('adzuna')")
+        connection.execute(
+            "INSERT INTO jobs (profile_id, title, company_id, location_id,"
+            " source_id, scraped_at, score) VALUES (1, 'Dev', 1, 1, 1,"
+            " '2026-07-08', 0)"
+        )
+        connection.execute(
+            "INSERT INTO score_runs (job_id, profile_id, pipeline_version,"
+            " weights_version, status, score) VALUES (1, 1, '1', '1',"
+            " 'scored', 0)"
+        )
+        connection.execute(
+            "INSERT INTO score_layer_results (score_run_id, layer, status,"
+            " score) VALUES (1, 'keyword', 'success', 0)"
+        )
