@@ -18,7 +18,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/jobs", response_class=HTMLResponse)
+@router.get("/jobs", response_class=HTMLResponse, include_in_schema=False)
 def jobs_page(
     request: Request,
     session: Session = Depends(get_session),

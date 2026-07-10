@@ -77,7 +77,7 @@ def _render_list(
     )
 
 
-@router.get("/profiles", response_class=HTMLResponse)
+@router.get("/profiles", response_class=HTMLResponse, include_in_schema=False)
 def profiles_page(
     request: Request,
     session: Session = Depends(get_session),
@@ -103,11 +103,12 @@ def profiles_list_partial(
     return _render_list(request, session)
 
 
-@router.post("/profiles", response_class=HTMLResponse)
+@router.post("/profiles", response_class=HTMLResponse, include_in_schema=False)
 async def create_profile_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Create a profile from the form and render the refreshed list."""
     form = await _read_form(request)
     try:
         create_profile(session, **_profile_values(form))
@@ -116,12 +117,17 @@ async def create_profile_route(
     return _render_list(request, session)
 
 
-@router.patch("/profiles/{profile_id}", response_class=HTMLResponse)
+@router.patch(
+    "/profiles/{profile_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def update_profile_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Update one profile from the form and render the refreshed list."""
     form = await _read_form(request)
     try:
         update_profile(session, profile_id, **_profile_values(form))
@@ -130,12 +136,17 @@ async def update_profile_route(
     return _render_list(request, session)
 
 
-@router.delete("/profiles/{profile_id}", response_class=HTMLResponse)
+@router.delete(
+    "/profiles/{profile_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 def delete_profile_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Delete one profile and render the refreshed list."""
     try:
         delete_profile(session, profile_id)
     except ProfileError as error:
@@ -146,12 +157,14 @@ def delete_profile_route(
 @router.post(
     "/profiles/{profile_id}/source-queries",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def create_source_query_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Attach a per-source search query to a profile and render the list."""
     form = await _read_form(request)
     return _mutate_query(
         request,
@@ -168,6 +181,7 @@ async def create_source_query_route(
 @router.patch(
     "/profiles/{profile_id}/source-queries/{query_id}",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def update_source_query_route(
     profile_id: int,
@@ -175,6 +189,7 @@ async def update_source_query_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Update one per-source search query and render the refreshed list."""
     form = await _read_form(request)
     return _mutate_query(
         request,
@@ -191,6 +206,7 @@ async def update_source_query_route(
 @router.delete(
     "/profiles/{profile_id}/source-queries/{query_id}",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 def delete_source_query_route(
     profile_id: int,
@@ -198,6 +214,7 @@ def delete_source_query_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Delete one per-source search query and render the refreshed list."""
     try:
         delete_source_query(session, profile_id=profile_id, query_id=query_id)
     except ProfileError as error:

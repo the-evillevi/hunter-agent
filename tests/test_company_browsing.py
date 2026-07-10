@@ -197,17 +197,12 @@ def test_companies_routes_reject_invalid_query_values(client, parameters) -> Non
     assert response.status_code == 422
 
 
-def test_internal_partial_reads_are_excluded_from_openapi(client) -> None:
+def test_company_ui_routes_are_excluded_from_openapi(client) -> None:
+    # The project-wide visibility policy lives in tests/test_openapi.py; this
+    # covers the company surfaces specifically.
     paths = client.get("/openapi.json").json()["paths"]
 
-    assert "/companies" in paths
-    assert "/jobs" in paths
-    assert "/profiles" in paths
-    partial_paths = {
-        "/companies/partials/table",
-        "/jobs/partials/list",
-        "/sources/partials/list",
-        "/applications/partials/list",
-        "/profiles/partials/list",
-    }
-    assert partial_paths.isdisjoint(paths)
+    assert "/api/companies/sp500/ingest" in paths
+    assert "/companies" not in paths
+    assert "/companies/partials/table" not in paths
+    assert "/companies/sp500/ingest" not in paths

@@ -38,7 +38,11 @@ def applications_list_partial(
     )
 
 
-@router.patch("/applications/{application_id}", response_class=HTMLResponse)
+@router.patch(
+    "/applications/{application_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def update_application_status_card(
     application_id: int,
     request: Request,
