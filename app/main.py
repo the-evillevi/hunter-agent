@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.config import PROJECT_ROOT
 from app.routes import (
     applications,
+    blacklist,
     companies,
     dashboard,
     health,
@@ -75,3 +76,4 @@ app.include_router(profiles.router)
 app.include_router(sources.router)
 app.include_router(companies.router)
 app.include_router(resumes.router)
+app.include_router(blacklist.router)
