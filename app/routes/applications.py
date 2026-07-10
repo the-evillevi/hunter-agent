@@ -10,6 +10,7 @@ from app.models.application import ApplicationStatus
 from app.services.applications import (
     APPLICATION_STATUS_ORDER,
     list_applications,
+    update_application_notes,
     update_application_status,
 )
 
@@ -65,6 +66,44 @@ async def update_application_status_card(
             session,
             application_id=application_id,
             status=status,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    return templates.TemplateResponse(
+        request,
+        "_application_card.html",
+        {
+            "application": application,
+            "application_statuses": APPLICATION_STATUS_ORDER,
+        },
+    )
+
+
+@router.patch(
+    "/applications/{application_id}/notes",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+async def update_application_notes_card(
+    application_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Save (or clear) one application's notes and render its card.
+
+    ``keep_blank_values`` matters: submitting an emptied textarea must
+    reach the service as an empty string so it clears the stored notes.
+    """
+    body = (await request.body()).decode()
+    form = parse_qs(body, keep_blank_values=True)
+    notes = form.get("notes", [""])[0]
+
+    try:
+        application = update_application_notes(
+            session,
+            application_id=application_id,
+            notes=notes,
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
