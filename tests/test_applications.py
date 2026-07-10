@@ -274,12 +274,15 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
             """
             SELECT p.role_name, s.name,
                    json_extract(psq.query_json, '$.category'),
-                   json_extract(psq.query_json, '$.search'),
+                   COALESCE(
+                     json_extract(psq.query_json, '$.search'),
+                     json_extract(psq.query_json, '$.what')
+                   ),
                    json_extract(psq.query_json, '$.limit')
             FROM profile_source_queries psq
             JOIN profiles p ON p.id = psq.profile_id
             JOIN sources s ON s.id = psq.source_id
-            ORDER BY p.id
+            ORDER BY psq.id
             """
         ).fetchall()
 
@@ -306,6 +309,8 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
             "fullstack",
             10,
         ),
+        ("AI Engineer", "Adzuna", "it-jobs", "AI engineer", None),
+        ("Senior Fullstack Engineer", "Adzuna", "it-jobs", "fullstack", None),
     ]
     assert {
         "ticker",

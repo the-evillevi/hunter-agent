@@ -14,7 +14,7 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse, include_in_schema=False)
 def home(request: Request, session: Session = Depends(get_session)) -> HTMLResponse:
     """Render application metrics and the tracked application list."""
     return templates.TemplateResponse(
