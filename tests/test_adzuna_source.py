@@ -115,6 +115,32 @@ def test_adzuna_adapter_builds_authenticated_request_from_context() -> None:
     assert seen_request.url.params["permanent"] == "1"
 
 
+def test_adzuna_adapter_applies_timeout_to_injected_client() -> None:
+    seen_timeout: dict[str, float | None] | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_timeout
+        seen_timeout = request.extensions.get("timeout")
+        return httpx.Response(200, json={"results": []}, request=request)
+
+    async def run_fetch() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            timeout=None,
+        ) as client:
+            adapter = AdzunaJobSourceAdapter(
+                client=client,
+                settings=adzuna_settings(),
+                timeout=4.5,
+            )
+            await adapter.fetch(JobSourceRunContext(source_query={"what": "AI"}))
+
+    asyncio.run(run_fetch())
+
+    assert seen_timeout is not None
+    assert set(seen_timeout.values()) == {4.5}
+
+
 def test_adzuna_adapter_paginates_and_stops_on_short_page() -> None:
     seen_pages: list[str] = []
 

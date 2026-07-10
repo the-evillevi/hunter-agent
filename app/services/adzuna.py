@@ -130,7 +130,11 @@ class AdzunaJobSourceAdapter:
     ) -> Mapping[str, Any]:
         url = f"{self._base_url}/{settings.country}/search/{page}"
         try:
-            response = await client.get(url, params=params)
+            response = await client.get(
+                url,
+                params=params,
+                timeout=self._timeout,
+            )
         except httpx.RequestError as error:
             raise AdzunaAdapterError("Adzuna API request failed") from error
         return _response_json(response)
