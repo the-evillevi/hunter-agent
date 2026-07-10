@@ -8,9 +8,13 @@ as the API grows. New routes that break these rules should fail here, not in
 a manual Swagger review.
 """
 
+import tomllib
+
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app.config import PROJECT_ROOT
+from app.main import app, app_version
+from app.services.sp500_ingestion import Sp500IngestionSummary
 
 
 PUBLIC_PATHS = {
@@ -86,12 +90,25 @@ def test_ingestion_trigger_documents_its_error_statuses() -> None:
         assert "$ref" in schema, f"{status_code} response is untyped"
 
 
+def test_ingestion_responses_include_valid_examples() -> None:
+    operation = openapi_document()["paths"]["/api/companies/sp500/ingest"]["post"]
+
+    for status_code in ("200", "409", "500", "502"):
+        example = operation["responses"][status_code]["content"]["application/json"][
+            "example"
+        ]
+        assert Sp500IngestionSummary.model_validate(example)
+
+
 def test_app_metadata_gives_swagger_users_project_context() -> None:
     info = openapi_document()["info"]
+    with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+        project_version = tomllib.load(project_file)["project"]["version"]
 
     assert info["title"] == "Hunter Agent"
     assert "JSON" in info["description"]
-    assert info["version"] not in ("", "0.1")  # a real version, not a placeholder
+    assert info["version"] == project_version
+    assert app_version() == project_version
 
 
 def test_docs_and_openapi_endpoints_are_served(client: TestClient) -> None:

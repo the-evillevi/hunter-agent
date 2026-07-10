@@ -1,8 +1,10 @@
 from importlib import metadata
+import tomllib
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from app.config import PROJECT_ROOT
 from app.routes import (
     applications,
     companies,
@@ -23,7 +25,17 @@ def app_version() -> str:
     try:
         return metadata.version("hunter-agent")
     except metadata.PackageNotFoundError:
-        return "0.0.0"
+        try:
+            with (PROJECT_ROOT / "pyproject.toml").open("rb") as project_file:
+                project = tomllib.load(project_file).get("project", {})
+        except OSError, tomllib.TOMLDecodeError:
+            return "unknown"
+        version = project.get("version")
+        return (
+            version.strip()
+            if isinstance(version, str) and version.strip()
+            else "unknown"
+        )
 
 
 # Swagger UI (/docs) and /openapi.json document the JSON API surface only.

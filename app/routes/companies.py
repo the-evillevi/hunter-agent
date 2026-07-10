@@ -22,6 +22,69 @@ templates = Jinja2Templates(directory="app/templates")
 CompanyTier = Literal["all", "mag7", "top100", "top200", "top300", "top400", "top500"]
 CompanyMembership = Literal["current", "all"]
 
+SP500_INGESTION_EXAMPLES = {
+    200: {
+        "status": "success",
+        "sources": ["ssga_spy_holdings"],
+        "created": 2,
+        "updated": 498,
+        "unchanged": 0,
+        "removed_from_index": 0,
+        "failed": 0,
+        "failures": [],
+    },
+    409: {
+        "status": "failed",
+        "sources": [],
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "removed_from_index": 0,
+        "failed": 1,
+        "failures": [
+            {
+                "source": "company_sources",
+                "stage": "selection",
+                "message": "no S&P 500 company sources are enabled",
+            }
+        ],
+    },
+    500: {
+        "status": "failed",
+        "sources": ["ssga_spy_holdings"],
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "removed_from_index": 0,
+        "failed": 1,
+        "failures": [
+            {
+                "source": "ssga_spy_holdings",
+                "stage": "persistence",
+                "message": "database write failed",
+                "symbol": "ACME",
+                "name": "Acme Corp",
+            }
+        ],
+    },
+    502: {
+        "status": "failed",
+        "sources": ["ssga_spy_holdings"],
+        "created": 0,
+        "updated": 0,
+        "unchanged": 0,
+        "removed_from_index": 0,
+        "failed": 1,
+        "failures": [
+            {
+                "source": "ssga_spy_holdings",
+                "stage": "provider",
+                "message": "upstream workbook could not be downloaded",
+            }
+        ],
+    },
+}
+
 
 def _companies_context(
     *,
@@ -164,17 +227,25 @@ def companies_table_partial(
     summary="Run the S&P 500 company ingestion",
     response_model=Sp500IngestionSummary,
     responses={
+        200: {
+            "model": Sp500IngestionSummary,
+            "description": "The enabled sources completed successfully.",
+            "content": {"application/json": {"example": SP500_INGESTION_EXAMPLES[200]}},
+        },
         409: {
             "model": Sp500IngestionSummary,
             "description": "No enabled S&P company source to run.",
+            "content": {"application/json": {"example": SP500_INGESTION_EXAMPLES[409]}},
         },
         500: {
             "model": Sp500IngestionSummary,
             "description": "Every selected source failed before persistence.",
+            "content": {"application/json": {"example": SP500_INGESTION_EXAMPLES[500]}},
         },
         502: {
             "model": Sp500IngestionSummary,
             "description": "An upstream provider returned unusable data.",
+            "content": {"application/json": {"example": SP500_INGESTION_EXAMPLES[502]}},
         },
     },
 )
