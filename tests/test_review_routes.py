@@ -10,25 +10,11 @@ from app.models.score_run import ScoreLayerResultRow, ScoreRun
 from app.services.blacklist import add_job_to_blacklist
 
 
-def make_run(session: Session, job, *, status: str = "scored", score=80) -> ScoreRun:
-    run = ScoreRun(
-        job_id=job.id,
-        profile_id=job.profile_id,
-        pipeline_version="1",
-        weights_version="1",
-        status=status,
-        score=score if status == "scored" else None,
-        warnings=json.dumps([]),
-    )
-    session.add(run)
-    session.commit()
-    session.refresh(run)
-    return run
-
-
-def test_review_page_renders_with_filters(client, session, create_job) -> None:
+def test_review_page_renders_with_filters(
+    client, session, create_job, create_score_run
+) -> None:
     job = create_job(title="Reviewable role")
-    make_run(session, job, score=77)
+    create_score_run(job, score=77)
 
     response = client.get("/review")
 
@@ -39,11 +25,11 @@ def test_review_page_renders_with_filters(client, session, create_job) -> None:
 
 
 def test_table_partial_preserves_filters_in_pagination_urls(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     for index in range(3):
         job = create_job(title=f"Role {index}")
-        make_run(session, job, score=60 + index)
+        create_score_run(job, score=60 + index)
 
     response = client.get(
         "/review/partials/table",
@@ -61,9 +47,11 @@ def test_table_partial_preserves_filters_in_pagination_urls(
     assert "page=2" in response.text
 
 
-def test_blank_filter_values_mean_no_filter(client, session, create_job) -> None:
+def test_blank_filter_values_mean_no_filter(
+    client, session, create_job, create_score_run
+) -> None:
     job = create_job(title="Unfiltered role")
-    make_run(session, job, score=10)
+    create_score_run(job, score=10)
 
     response = client.get(
         "/review/partials/table", params={"profile_id": "", "min_score": ""}
@@ -73,18 +61,24 @@ def test_blank_filter_values_mean_no_filter(client, session, create_job) -> None
     assert "Unfiltered role" in response.text
 
 
-def test_garbage_filter_values_are_400(client) -> None:
-    assert (
-        client.get("/review/partials/table", params={"min_score": "many"}).status_code
-        == 400
-    )
+def test_garbage_filter_values_are_400_html_fragments(client) -> None:
+    response = client.get("/review/partials/table", params={"min_score": "many"})
+
+    assert response.status_code == 400
+    # HTML, not JSON: the htmx error hook only swaps text/html responses.
+    assert "text/html" in response.headers["content-type"]
+    assert "must be a number" in response.text
+
+    out_of_range = client.get("/review", params={"min_score": "200"})
+    assert out_of_range.status_code == 400
+    assert "out of range" in out_of_range.text
 
 
 def test_detail_partial_shows_layers_warnings_and_version(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     job = create_job(title="Evidence role")
-    run = make_run(session, job, score=82)
+    run = create_score_run(job, score=82)
     run.warnings = json.dumps(["unchecked constraint: salary"])
     session.add(run)
     session.add(
@@ -107,8 +101,12 @@ def test_detail_partial_shows_layers_warnings_and_version(
     assert "pipeline v1" in response.text
 
 
+def test_detail_partial_for_missing_job_is_404(client) -> None:
+    assert client.get("/review/partials/jobs/999/detail").status_code == 404
+
+
 def test_detail_partial_for_unscored_job_shows_empty_state(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     job = create_job(title="Never scored")
 
@@ -119,10 +117,10 @@ def test_detail_partial_for_unscored_job_shows_empty_state(
 
 
 def test_draft_action_creates_draft_and_flips_row_state(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     job = create_job(title="Draft me")
-    make_run(session, job, score=91)
+    create_score_run(job, score=91)
 
     response = client.post(f"/jobs/{job.id}/application")
 
@@ -137,10 +135,10 @@ def test_draft_action_creates_draft_and_flips_row_state(
 
 
 def test_draft_action_rejects_blacklisted_job_with_409_row(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     job = create_job(title="Blocked role")
-    make_run(session, job, score=95)
+    create_score_run(job, score=95)
     add_job_to_blacklist(session, job_id=job.id, reason="scam")
 
     response = client.post(f"/jobs/{job.id}/application")
@@ -150,10 +148,10 @@ def test_draft_action_rejects_blacklisted_job_with_409_row(
 
 
 def test_draft_action_rejects_duplicates_with_409_row(
-    client, session, create_job
+    client, session, create_job, create_score_run
 ) -> None:
     job = create_job(title="Already drafted")
-    make_run(session, job, score=95)
+    create_score_run(job, score=95)
     assert client.post(f"/jobs/{job.id}/application").status_code == 200
 
     response = client.post(f"/jobs/{job.id}/application")

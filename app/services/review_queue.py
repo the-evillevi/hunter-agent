@@ -44,6 +44,21 @@ ACTED_STATUSES = frozenset(
     }
 )
 
+# Outcome progression for the sortable column: furthest along first when
+# descending. Enum strings sort lexicographically otherwise, which would
+# put "rejected" above "offer".
+STATUS_PROGRESSION = (
+    ApplicationStatus.draft,
+    ApplicationStatus.pending,
+    ApplicationStatus.applied,
+    ApplicationStatus.ghosted,
+    ApplicationStatus.rejected,
+    ApplicationStatus.acknowledged,
+    ApplicationStatus.interviews,
+    ApplicationStatus.offer,
+    ApplicationStatus.accepted,
+)
+
 
 @dataclass(frozen=True)
 class ReviewQueueItem:
@@ -118,15 +133,12 @@ def list_review_queue(
     if min_score is not None:
         filters.append(ScoreRun.score >= min_score)
 
+    # .where(*filters) is a no-op for an empty list, so one construction
+    # serves both the filtered and unfiltered cases.
     count_statement = select(func.count()).select_from(
-        _review_join(select(Job.id)).subquery()
+        _review_join(select(Job.id)).where(*filters).subquery()
     )
-    statement = _review_join(_review_select())
-    if filters:
-        count_statement = select(func.count()).select_from(
-            _review_join(select(Job.id).where(*filters)).subquery()
-        )
-        statement = statement.where(*filters)
+    statement = _review_join(_review_select()).where(*filters)
 
     total = session.exec(count_statement).one()
     total_pages = (total + page_size - 1) // page_size
@@ -225,8 +237,16 @@ def _order_by(sort: ReviewSort, descending: bool):
     score_nulls_last = case((ScoreRun.score.is_(None), 1), else_=0)
     score_order = ScoreRun.score.desc() if descending else ScoreRun.score.asc()
     if sort == "status":
-        status_key = func.coalesce(Application.status, "")
-        primary = [status_key.desc() if descending else status_key.asc()]
+        # Rank by outcome progression, not by the enum's spelling; jobs
+        # without an application rank below every real outcome.
+        status_rank = case(
+            *(
+                (Application.status == status, rank)
+                for rank, status in enumerate(STATUS_PROGRESSION, start=1)
+            ),
+            else_=0,
+        )
+        primary = [status_rank.desc() if descending else status_rank.asc()]
     else:
         primary = []
     # Score and job id always close the ordering so ties are stable.

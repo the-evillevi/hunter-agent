@@ -49,26 +49,17 @@ def review_page(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Render the complete review queue page with its filter form."""
-    profile_filter = _parse_optional_int("profile_id", profile_id, low=1, high=None)
-    score_filter = _parse_optional_int("min_score", min_score, low=0, high=100)
-    review_page_data = _query_review(
+    return _render_review(
+        request,
         session,
-        profile_id=profile_filter,
-        min_score=score_filter,
+        template="review.html",
+        profile_id=profile_id,
+        min_score=min_score,
         sort=sort,
         desc=desc,
         page=page,
         page_size=page_size,
     )
-    context = _review_context(
-        review_page=review_page_data,
-        profile_id=profile_filter,
-        min_score=score_filter,
-        sort=sort,
-        desc=desc,
-    )
-    context["profiles"] = list_profiles(session)
-    return templates.TemplateResponse(request, "review.html", context)
 
 
 @router.get(
@@ -87,27 +78,16 @@ def review_table_partial(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Render only the review table fragment for HTMX pagination."""
-    profile_filter = _parse_optional_int("profile_id", profile_id, low=1, high=None)
-    score_filter = _parse_optional_int("min_score", min_score, low=0, high=100)
-    review_page_data = _query_review(
+    return _render_review(
+        request,
         session,
-        profile_id=profile_filter,
-        min_score=score_filter,
+        template="_review_table.html",
+        profile_id=profile_id,
+        min_score=min_score,
         sort=sort,
         desc=desc,
         page=page,
         page_size=page_size,
-    )
-    return templates.TemplateResponse(
-        request,
-        "_review_table.html",
-        _review_context(
-            review_page=review_page_data,
-            profile_id=profile_filter,
-            min_score=score_filter,
-            sort=sort,
-            desc=desc,
-        ),
     )
 
 
@@ -122,6 +102,8 @@ def review_row_detail_partial(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Render one job's layer evidence into its expandable detail row."""
+    if get_review_queue_item(session, job_id) is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} was not found")
     detail = get_review_run_detail(session, job_id=job_id)
     return templates.TemplateResponse(
         request,
@@ -151,14 +133,63 @@ def start_application_draft(
     return _review_row_response(request, session, job_id, error=error)
 
 
+def _render_review(
+    request: Request,
+    session: Session,
+    *,
+    template: str,
+    profile_id: str | None,
+    min_score: str | None,
+    sort: ReviewSort,
+    desc: SortDirection,
+    page: int,
+    page_size: int,
+) -> HTMLResponse:
+    """One body for the full page and the table partial.
+
+    Both routes must parse filters identically or the page and its HTMX
+    refreshes drift apart; only the template (and the page's profile
+    dropdown data) differ.
+    """
+    try:
+        profile_filter = _parse_optional_int("profile_id", profile_id, low=1)
+        score_filter = _parse_optional_int("min_score", min_score, low=0, high=100)
+    except ValueError as error:
+        # An HTML fragment, not JSON: the htmx error hook in base.html
+        # only swaps text/html error responses into the page.
+        return HTMLResponse(
+            f'<div class="alert alert-error text-sm">{error}</div>',
+            status_code=400,
+        )
+    review_page_data = _query_review(
+        session,
+        profile_id=profile_filter,
+        min_score=score_filter,
+        sort=sort,
+        desc=desc,
+        page=page,
+        page_size=page_size,
+    )
+    context = _review_context(
+        review_page=review_page_data,
+        profile_id=profile_filter,
+        min_score=score_filter,
+        sort=sort,
+        desc=desc,
+    )
+    if template == "review.html":
+        context["profiles"] = list_profiles(session)
+    return templates.TemplateResponse(request, template, context)
+
+
 def _parse_optional_int(
     name: str,
     value: str | None,
     *,
-    low: int | None,
-    high: int | None,
+    low: int | None = None,
+    high: int | None = None,
 ) -> int | None:
-    """Empty form fields mean "no filter"; garbage is an explicit 400.
+    """Empty form fields mean "no filter"; garbage is an explicit error.
 
     FastAPI would reject an empty string for an int query outright, but
     the filter form always submits both fields, so blank must be legal.
@@ -168,11 +199,9 @@ def _parse_optional_int(
     try:
         number = int(value)
     except ValueError as error:
-        raise HTTPException(
-            status_code=400, detail=f"{name} must be a number"
-        ) from error
+        raise ValueError(f"{name} must be a number") from error
     if (low is not None and number < low) or (high is not None and number > high):
-        raise HTTPException(status_code=400, detail=f"{name} is out of range")
+        raise ValueError(f"{name} is out of range")
     return number
 
 
@@ -225,11 +254,13 @@ def _review_context(
         path = "/review/partials/table" if partial else "/review"
         return f"{path}?{urlencode(parameters)}"
 
-    def sort_url(column: ReviewSort) -> str:
+    def sort_url(column: ReviewSort, *, partial: bool) -> str:
         # Clicking the active column flips direction; a new column starts
         # descending (best scores / furthest outcomes first).
         flipped: SortDirection = "0" if (sort == column and desc == "1") else "1"
-        return review_url(1, partial=True, sort_override=column, desc_override=flipped)
+        return review_url(
+            1, partial=partial, sort_override=column, desc_override=flipped
+        )
 
     return {
         "review_page": review_page,
@@ -252,13 +283,10 @@ def _review_context(
             if review_page.next_page is not None
             else None
         ),
-        "next_url": (
-            review_url(review_page.next_page, partial=False)
-            if review_page.next_page is not None
-            else None
-        ),
-        "sort_score_url": sort_url("score"),
-        "sort_status_url": sort_url("status"),
+        "sort_score_url": sort_url("score", partial=True),
+        "sort_score_href": sort_url("score", partial=False),
+        "sort_status_url": sort_url("status", partial=True),
+        "sort_status_href": sort_url("status", partial=False),
     }
 
 

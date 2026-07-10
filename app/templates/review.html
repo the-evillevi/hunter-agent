@@ -46,9 +46,10 @@
           />
         </label>
 
-        <input type="hidden" name="sort" value="{{ sort }}" />
-        <input type="hidden" name="desc" value="{{ desc }}" />
-
+        <!-- No hidden sort state here: header clicks update only the
+             table fragment, so a copy in the form would go stale and
+             silently revert the user's sort. Filtering resets to the
+             default score ordering instead. -->
         <button type="submit" class="btn btn-primary btn-sm">Filter</button>
       </form>
 
