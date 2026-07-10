@@ -128,9 +128,7 @@ def test_deleting_profile_cascades_to_sections_and_items(session: Session) -> No
     assert session.get(ResumeItem, item_id) is None
 
 
-def test_deleting_profile_cascades_to_tailor_runs(
-    session: Session, create_job
-) -> None:
+def test_deleting_profile_cascades_to_tailor_runs(session: Session, create_job) -> None:
     job = create_job()
     base = create_resume_profile(session, name="master")
     output = create_resume_profile(session, name="tailored")
