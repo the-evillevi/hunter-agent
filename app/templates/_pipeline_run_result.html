@@ -1,0 +1,32 @@
+<!-- One-run status fragment rendered after a manual pipeline trigger. -->
+<div
+  class="alert {% if summary.status == 'success' %}alert-success{% elif summary.status == 'partial' %}alert-warning{% elif summary.status == 'skipped_overlap' %}alert-warning{% else %}alert-error{% endif %} mt-4"
+  role="status"
+>
+  <div>
+    <p class="font-semibold">
+      {% if summary.status == "success" %}
+        Pipeline run completed
+      {% elif summary.status == "partial" %}
+        Pipeline run completed with failures
+      {% elif summary.status == "skipped_overlap" %}
+        Pipeline run skipped: another run is already in progress
+      {% else %}
+        Pipeline run failed
+      {% endif %}
+    </p>
+    <p class="mt-1 text-sm">
+      Discovered {{ summary.discovered }}, persisted {{ summary.persisted }},
+      duplicates {{ summary.duplicates }}, scored {{ summary.scored }}, rejected
+      {{ summary.rejected }}, failed {{ summary.failed }}.
+    </p>
+
+    {% if summary.errors %}
+      <ul class="mt-2 list-disc pl-5 text-sm">
+        {% for error in summary.errors %}
+          <li>{{ error.stage }}: {{ error.message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</div>

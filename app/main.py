@@ -11,6 +11,7 @@ from app.routes import (
     dashboard,
     health,
     jobs,
+    pipeline,
     profiles,
     resumes,
     sources,
@@ -60,6 +61,10 @@ app = FastAPI(
             "name": "Ingestion",
             "description": "Manually triggered data ingestion runs.",
         },
+        {
+            "name": "Pipeline",
+            "description": "End-to-end job pipeline runs through scoring.",
+        },
     ],
 )
 
@@ -75,3 +80,4 @@ app.include_router(profiles.router)
 app.include_router(sources.router)
 app.include_router(companies.router)
 app.include_router(resumes.router)
+app.include_router(pipeline.router)
