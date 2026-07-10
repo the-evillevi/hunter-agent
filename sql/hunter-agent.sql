@@ -236,6 +236,7 @@ CREATE TABLE pipeline_runs (
   finished_at DATETIME,
   discovered_count INTEGER NOT NULL DEFAULT 0 CHECK (discovered_count >= 0),
   persisted_count INTEGER NOT NULL DEFAULT 0 CHECK (persisted_count >= 0),
+  duplicates_count INTEGER NOT NULL DEFAULT 0 CHECK (duplicates_count >= 0),
   rejected_count INTEGER NOT NULL DEFAULT 0 CHECK (rejected_count >= 0),
   scored_count INTEGER NOT NULL DEFAULT 0 CHECK (scored_count >= 0),
   failed_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_count >= 0),

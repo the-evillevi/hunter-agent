@@ -14,6 +14,7 @@ scoring for jobs that were already persisted.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from collections.abc import Awaitable, Callable, Sequence
@@ -34,7 +35,11 @@ from app.services.ai.embeddings import OllamaEmbeddingsClient
 from app.services.ai.ollama import OllamaCompletionProvider
 from app.services.job_ingestion import JobIngestionSummary, ingest_normalized_jobs
 from app.services.llm_scoring import LlmScoreLayer
-from app.services.profiles import get_profile, list_profile_runs_for_source
+from app.services.profiles import (
+    ProfileDetail,
+    get_profile,
+    list_profile_runs_for_source,
+)
 from app.services.scoring_pipeline import (
     LAYER_WEIGHTS,
     MAX_FAILURE_DETAIL_CHARS,
@@ -136,19 +141,30 @@ class PipelineStages:
         [Session, str, JobSourceRunContext], Awaitable[list[NormalizedJob]]
     ]
     ingest_jobs: Callable[[Session, Sequence[NormalizedJob]], JobIngestionSummary]
-    score_persisted_job: Callable[
-        [Session, int, ScoreLayerRegistry | None], Awaitable[str]
-    ]
+    score_persisted_job: Callable[[Session, int, ScoreLayerRegistry], Awaitable[str]]
 
 
 def default_pipeline_stages() -> PipelineStages:
-    """Wire the real service boundaries into the stage contract."""
+    """Wire the real service boundaries into the stage contract.
+
+    The scoring stage carries a per-run profile cache so a run that scores
+    many jobs resolves each owning profile once instead of per job.
+    """
+    profile_cache: dict[int, ProfileDetail] = {}
+
+    async def score_with_cached_profiles(
+        session: Session, job_id: int, registry: ScoreLayerRegistry
+    ) -> str:
+        return await _score_persisted_job(
+            session, job_id, registry, profile_cache=profile_cache
+        )
+
     return PipelineStages(
         resolve_source_names=_resolve_enabled_source_names,
         list_run_contexts=list_profile_runs_for_source,
         fetch_jobs=_fetch_jobs_for_source,
         ingest_jobs=ingest_normalized_jobs,
-        score_persisted_job=_score_persisted_job,
+        score_persisted_job=score_with_cached_profiles,
     )
 
 
@@ -194,25 +210,29 @@ async def run_job_pipeline(
     trigger produces a ``skipped_overlap`` row instead of duplicate
     scraping or scoring. The pipeline stops after scoring by design.
     """
-    resolved_config = config or load_config()
-    resolved_stages = stages or default_pipeline_stages()
     resolved_now = now or datetime.now
-    resolved_lock = lock_path or Path(resolved_config.scheduler.lock_file)
-
     started_at = resolved_now()
     summary = PipelineRunSummary(trigger_type=trigger_type, started_at=started_at)
 
-    lock_descriptor = _acquire_lock(resolved_lock)
-    if lock_descriptor is None:
-        summary.status = "skipped_overlap"
-        summary.finished_at = started_at
-        summary.add_error(
-            "run",
-            f"another pipeline run holds the lock file {resolved_lock}",
-        )
-        return _persist_run(session, summary), summary
-
+    # Everything after this point — even config loading and lock setup —
+    # records its failure on the summary, so a run row always exists.
+    lock_descriptor: int | None = None
+    resolved_lock: Path | None = None
     try:
+        resolved_config = config or load_config()
+        resolved_stages = stages or default_pipeline_stages()
+        resolved_lock = lock_path or Path(resolved_config.scheduler.lock_file)
+
+        lock_descriptor = _acquire_lock(resolved_lock)
+        if lock_descriptor is None:
+            summary.status = "skipped_overlap"
+            summary.finished_at = started_at
+            summary.add_error(
+                "run",
+                f"another pipeline run holds the lock file {resolved_lock}",
+            )
+            return _persist_run(session, summary), summary
+
         if scoring_registry is None:
             scoring_registry = build_scoring_registry(resolved_config)
         await _run_stages(
@@ -221,10 +241,22 @@ async def run_job_pipeline(
             scoring_registry=scoring_registry,
             summary=summary,
         )
+    except asyncio.CancelledError:
+        # A cancelled request (closed browser tab) must still leave an
+        # audit row: ingestion and scoring may have already committed.
+        session.rollback()
+        summary.add_error("run", "run was cancelled before completion")
+        summary.finish(resolved_now())
+        _persist_run(session, summary)
+        raise
     except Exception as error:  # noqa: BLE001 - a run row must always exist
+        # A mid-stage crash can leave the session in a pending-rollback
+        # state; reset it so the audit row insert below cannot fail.
+        session.rollback()
         summary.add_error("run", str(error))
     finally:
-        _release_lock(resolved_lock, lock_descriptor)
+        if lock_descriptor is not None and resolved_lock is not None:
+            _release_lock(resolved_lock, lock_descriptor)
 
     summary.finish(resolved_now())
     return _persist_run(session, summary), summary
@@ -294,7 +326,10 @@ async def _run_stages(
         elif status == "rejected":
             summary.rejected += 1
         else:
+            # A "failed" score result means no layer produced a score; the
+            # run must not look successful just because nothing raised.
             summary.failed += 1
+            summary.add_error("scoring", f"job {job_id}: no scoring layer succeeded")
 
 
 def _resolve_enabled_source_names(session: Session) -> list[str]:
@@ -321,23 +356,31 @@ async def _fetch_jobs_for_source(
 async def _score_persisted_job(
     session: Session,
     job_id: int,
-    registry: ScoreLayerRegistry | None,
+    registry: ScoreLayerRegistry,
+    *,
+    profile_cache: dict[int, ProfileDetail] | None = None,
 ) -> str:
-    """Score one persisted job against its owning profile and store the run."""
+    """Score one persisted job against its owning profile and store the run.
+
+    ``profile_cache`` lets one run resolve each profile once instead of
+    re-querying the profile aggregate for every job it scores.
+    """
     job = session.get(Job, job_id)
     if job is None:
         raise ValueError(f"job {job_id} disappeared before scoring")
     location = session.get(Location, job.location_id)
-    profile = get_profile(session, job.profile_id)
+    if profile_cache is not None and job.profile_id in profile_cache:
+        profile = profile_cache[job.profile_id]
+    else:
+        profile = get_profile(session, job.profile_id)
+        if profile_cache is not None:
+            profile_cache[job.profile_id] = profile
     job_input = ScoreJobInput(
         title=job.title,
         description=job.description,
         location=location.name if location is not None else None,
     )
-    if registry is None:
-        result = await score_job(job_input, profile)
-    else:
-        result = await score_job(job_input, profile, registry=registry)
+    result = await score_job(job_input, profile, registry=registry)
     save_score_run(
         session,
         job_id=job_id,
@@ -348,18 +391,59 @@ async def _score_persisted_job(
 
 
 def _acquire_lock(lock_path: Path) -> int | None:
-    """Create the lock file exclusively; ``None`` means another run owns it."""
+    """Create the lock file exclusively; ``None`` means another run owns it.
+
+    The file records the owning PID so a lock left behind by a crashed
+    process (kill -9, power loss) can be reclaimed instead of disabling
+    every future run until someone deletes the file by hand.
+    """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = _try_create_lock(lock_path)
+    if descriptor is None and not _lock_owner_is_alive(lock_path):
+        lock_path.unlink(missing_ok=True)
+        descriptor = _try_create_lock(lock_path)
+    if descriptor is None:
+        return None
+    os.write(descriptor, str(os.getpid()).encode())
+    return descriptor
+
+
+def _try_create_lock(lock_path: Path) -> int | None:
     try:
         return os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         return None
 
 
+def _lock_owner_is_alive(lock_path: Path) -> bool:
+    """Best-effort staleness check; anything unreadable counts as alive."""
+    try:
+        pid = int(lock_path.read_text().strip())
+    except OSError, ValueError:
+        return True
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 def _release_lock(lock_path: Path, descriptor: int) -> None:
-    """Close and remove the lock file so the next run can start."""
+    """Close and remove the lock file so the next run can start.
+
+    Only the recorded owner removes the file: if this run's stale lock was
+    already reclaimed by a newer run, deleting blindly would free a lock
+    that run still holds.
+    """
     os.close(descriptor)
-    lock_path.unlink(missing_ok=True)
+    try:
+        owner = lock_path.read_text().strip()
+    except OSError:
+        return
+    if owner == str(os.getpid()):
+        lock_path.unlink(missing_ok=True)
 
 
 def _persist_run(session: Session, summary: PipelineRunSummary) -> PipelineRun:
@@ -374,6 +458,7 @@ def _persist_run(session: Session, summary: PipelineRunSummary) -> PipelineRun:
         finished_at=summary.finished_at,
         discovered_count=summary.discovered,
         persisted_count=summary.persisted,
+        duplicates_count=summary.duplicates,
         rejected_count=summary.rejected,
         scored_count=summary.scored,
         failed_count=summary.failed,

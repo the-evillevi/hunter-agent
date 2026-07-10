@@ -1,6 +1,6 @@
 <!-- One-run status fragment rendered after a manual pipeline trigger. -->
 <div
-  class="alert {% if summary.status == 'success' %}alert-success{% elif summary.status == 'partial' %}alert-warning{% elif summary.status == 'skipped_overlap' %}alert-warning{% else %}alert-error{% endif %} mt-4"
+  class="alert {% if summary.status == 'success' %}alert-success{% elif summary.status in ('partial', 'skipped_overlap') %}alert-warning{% else %}alert-error{% endif %} mt-4"
   role="status"
 >
   <div>

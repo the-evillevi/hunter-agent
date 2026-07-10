@@ -34,6 +34,10 @@ class PipelineRun(SQLModel, table=True):
             name="ck_pipeline_runs_persisted",
         ),
         CheckConstraint(
+            "duplicates_count >= 0",
+            name="ck_pipeline_runs_duplicates",
+        ),
+        CheckConstraint(
             "rejected_count >= 0",
             name="ck_pipeline_runs_rejected",
         ),
@@ -59,6 +63,7 @@ class PipelineRun(SQLModel, table=True):
     finished_at: datetime | None = None
     discovered_count: int = 0
     persisted_count: int = 0
+    duplicates_count: int = 0
     rejected_count: int = 0
     scored_count: int = 0
     failed_count: int = 0

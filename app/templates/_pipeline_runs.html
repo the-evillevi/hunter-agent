@@ -1,14 +1,4 @@
 <!-- Recent pipeline runs (HNTR-51): one row per run from pipeline_runs. -->
-{% if next_run_time is defined %}
-  <p class="text-base-content/60 mb-2 text-sm">
-    {% if next_run_time %}
-      Next scheduled run: {{ next_run_time.strftime("%Y-%m-%d %H:%M") }}
-    {% else %}
-      Scheduler disabled
-    {% endif %}
-  </p>
-{% endif %}
-
 {% if pipeline_runs %}
   <div class="overflow-x-auto">
     <table class="table-zebra table text-sm">
@@ -19,6 +9,7 @@
           <th>Status</th>
           <th>Discovered</th>
           <th>Persisted</th>
+          <th>Duplicates</th>
           <th>Scored</th>
           <th>Rejected</th>
           <th>Failed</th>
@@ -42,6 +33,7 @@
             </td>
             <td>{{ run.discovered_count }}</td>
             <td>{{ run.persisted_count }}</td>
+            <td>{{ run.duplicates_count }}</td>
             <td>{{ run.scored_count }}</td>
             <td>{{ run.rejected_count }}</td>
             <td>{{ run.failed_count }}</td>

@@ -8,6 +8,8 @@ correct status derivation, and bounded error text.
 
 import asyncio
 import json
+import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -97,7 +99,7 @@ def all_runs(session: Session) -> list[PipelineRun]:
 
 
 def test_successful_run_persists_exactly_one_success_row(session, tmp_path) -> None:
-    ingestion = JobIngestionSummary(inserted_job_ids=[11, 12])
+    ingestion = JobIngestionSummary(inserted_job_ids=[11, 12], duplicate_count=3)
     stages = make_stages(fetched=["a", "b"], ingestion=ingestion)
 
     run, summary = run_pipeline(session, tmp_path, stages)
@@ -110,6 +112,7 @@ def test_successful_run_persists_exactly_one_success_row(session, tmp_path) -> N
     assert rows[0].status == "success"
     assert rows[0].trigger_type == "manual"
     assert rows[0].discovered_count == 2
+    assert rows[0].duplicates_count == 3
     assert rows[0].scored_count == 2
     assert rows[0].errors is None
     assert rows[0].finished_at is not None
@@ -131,13 +134,7 @@ def test_fetch_failure_still_ingests_other_sources_and_is_partial(
             raise ConnectionError("source API is down")
         return ["job"]
 
-    stages = PipelineStages(
-        resolve_source_names=stages.resolve_source_names,
-        list_run_contexts=stages.list_run_contexts,
-        fetch_jobs=fetch_jobs,
-        ingest_jobs=stages.ingest_jobs,
-        score_persisted_job=stages.score_persisted_job,
-    )
+    stages = replace(stages, fetch_jobs=fetch_jobs)
 
     run, summary = run_pipeline(session, tmp_path, stages)
 
@@ -207,6 +204,37 @@ def test_held_lock_records_one_skipped_overlap_row_without_stage_work(
     assert rows[0].status == "skipped_overlap"
     # The pre-existing lock file must be left alone for its real owner.
     assert lock_path.exists()
+
+
+def test_stale_lock_from_dead_process_is_reclaimed(session, tmp_path) -> None:
+    lock_path = tmp_path / "pipeline.lock"
+    # A finished child process gives us a PID that no longer exists.
+    dead = subprocess.Popen(["true"])
+    dead.wait()
+    lock_path.write_text(str(dead.pid))
+
+    run, summary = run_pipeline(session, tmp_path, make_stages(), lock_path=lock_path)
+
+    assert summary.status == "success"
+    assert not lock_path.exists()
+
+
+def test_failed_score_results_never_report_success(session, tmp_path) -> None:
+    ingestion = JobIngestionSummary(inserted_job_ids=[51, 52])
+    stages = make_stages(
+        fetched=["a"],
+        ingestion=ingestion,
+        score_statuses={51: "failed", 52: "failed"},
+    )
+
+    run, summary = run_pipeline(session, tmp_path, stages)
+
+    assert summary.status == "partial"
+    assert summary.failed == 2
+    assert any(
+        error.stage == "scoring" and "no scoring layer succeeded" in error.message
+        for error in summary.errors
+    )
 
 
 def test_lock_is_released_after_a_run(session, tmp_path) -> None:
@@ -295,14 +323,7 @@ def test_run_row_survives_unexpected_stage_crash(session, tmp_path) -> None:
     def resolve_source_names(session_) -> list[str]:
         raise RuntimeError("registry blew up")
 
-    broken = make_stages()
-    stages = PipelineStages(
-        resolve_source_names=resolve_source_names,
-        list_run_contexts=broken.list_run_contexts,
-        fetch_jobs=broken.fetch_jobs,
-        ingest_jobs=broken.ingest_jobs,
-        score_persisted_job=broken.score_persisted_job,
-    )
+    stages = replace(make_stages(), resolve_source_names=resolve_source_names)
 
     run, summary = run_pipeline(session, tmp_path, stages)
 
