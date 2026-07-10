@@ -7,7 +7,11 @@ explanation. Keeping the contract in `app/models/` mirrors how config and
 job shapes are defined once and consumed by services.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+
+from app.models.eligibility import EligibilityResult
 
 
 class ScoreLayerResult(BaseModel):
@@ -40,3 +44,43 @@ class KeywordScoreResult(ScoreLayerResult):
     matched_description_terms: tuple[str, ...]
     missing_terms: tuple[str, ...]
     excluded_terms_found: tuple[str, ...]
+
+
+class LayerOutcome(BaseModel):
+    """What happened to one registered layer during a pipeline run.
+
+    Success wraps the layer's result; skip records an unavailable optional
+    layer; failure records an unexpected layer error. Persistence (HNTR-10)
+    stores exactly this shape, so failures stay auditable after the run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    layer: str
+    status: Literal["success", "skip", "failure"]
+    result: SerializeAsAny[ScoreLayerResult] | None = None
+    duration_ms: int = Field(ge=0)
+    failure_code: str | None = None
+    failure_detail: str | None = None
+
+
+class JobScoreResult(BaseModel):
+    """One job's complete, explainable scoring outcome for one profile.
+
+    Rejected jobs carry the eligibility decision and no layer work; scored
+    jobs carry a bounded aggregate plus every per-layer outcome so UI and
+    persistence callers never need to re-run scoring to explain a number.
+    A failed run means eligibility passed but no score layer succeeded, so
+    no aggregate exists — that is different from legitimately scoring 0.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    status: Literal["rejected", "scored", "failed"]
+    eligibility: EligibilityResult
+    score: int | None = Field(default=None, ge=0, le=100)
+    layer_outcomes: tuple[LayerOutcome, ...] = ()
+    warnings: tuple[str, ...] = ()
+    explanation: str
+    pipeline_version: str
+    weights_version: str
