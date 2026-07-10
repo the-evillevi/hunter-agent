@@ -7,10 +7,16 @@ schema per test is intentionally simple to understand and maintain; the suite is
 small enough that the clarity is worth more than transaction-level reuse.
 """
 
+import os
 from collections.abc import Callable, Iterator
 from datetime import datetime
 
 import pytest
+
+# Every TestClient(app) startup runs the app lifespan; without this guard it
+# would boot a real APScheduler from config.toml in every route test. The
+# variable is read at lifespan time, so setting it here covers the suite.
+os.environ.setdefault("HUNTER_SCHEDULER_ENABLED", "0")
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel, Session, create_engine, select
