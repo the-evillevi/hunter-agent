@@ -8,11 +8,23 @@ decorator at a time and use the failing assertion as your next clue.
 from pathlib import Path
 import sqlite3
 
+import pytest
 from sqlmodel import Session
 
 from app.models.application import ApplicationStatus
 from app.routes import applications as applications_route
-from app.services.applications import list_applications, update_application_status
+from app.services.applications import (
+    DuplicateApplicationError,
+    create_application_draft,
+    list_applications,
+    update_application_notes,
+    update_application_status,
+)
+from app.services.blacklist import (
+    BlacklistedJobError,
+    add_company_to_blacklist,
+    add_job_to_blacklist,
+)
 
 
 def test_list_applications_returns_fixture_application(
@@ -349,8 +361,6 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
 def test_update_application_notes_saves_edits_and_clears(
     session, create_application
 ) -> None:
-    from app.services.applications import update_application_notes
-
     application = create_application(notes="old note")
 
     updated = update_application_notes(
@@ -365,10 +375,6 @@ def test_update_application_notes_saves_edits_and_clears(
 
 
 def test_update_application_notes_missing_application_raises(session) -> None:
-    from app.services.applications import update_application_notes
-
-    import pytest
-
     with pytest.raises(LookupError):
         update_application_notes(session, application_id=999, notes="x")
 
@@ -409,9 +415,6 @@ def test_notes_patch_route_missing_application_is_404(client) -> None:
 
 
 def test_create_application_draft_happy_path(session, create_job) -> None:
-    from app.models.application import ApplicationStatus
-    from app.services.applications import create_application_draft
-
     job = create_job()
 
     draft = create_application_draft(session, job_id=job.id)
@@ -422,11 +425,6 @@ def test_create_application_draft_happy_path(session, create_job) -> None:
 
 
 def test_create_application_draft_rejects_blacklisted_job(session, create_job) -> None:
-    import pytest
-
-    from app.services.applications import create_application_draft
-    from app.services.blacklist import BlacklistedJobError, add_job_to_blacklist
-
     job = create_job()
     add_job_to_blacklist(session, job_id=job.id, reason="scam")
 
@@ -437,11 +435,6 @@ def test_create_application_draft_rejects_blacklisted_job(session, create_job) -
 def test_create_application_draft_rejects_company_blacklisted_job(
     session, create_job
 ) -> None:
-    import pytest
-
-    from app.services.applications import create_application_draft
-    from app.services.blacklist import BlacklistedJobError, add_company_to_blacklist
-
     job = create_job(company_name="Blocked Corp")
     add_company_to_blacklist(session, company_id=job.company_id)
 
@@ -452,13 +445,6 @@ def test_create_application_draft_rejects_company_blacklisted_job(
 def test_create_application_draft_rejects_duplicates_and_missing_job(
     session, create_job, create_application
 ) -> None:
-    import pytest
-
-    from app.services.applications import (
-        DuplicateApplicationError,
-        create_application_draft,
-    )
-
     job = create_job()
     create_application(job=job)
 
@@ -471,8 +457,6 @@ def test_create_application_draft_rejects_duplicates_and_missing_job(
 def test_application_card_shows_blacklist_badge(
     client, session, create_job, create_application
 ) -> None:
-    from app.services.blacklist import add_job_to_blacklist
-
     job = create_job()
     create_application(job=job)
     add_job_to_blacklist(session, job_id=job.id)

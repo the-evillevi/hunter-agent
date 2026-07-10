@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.models.application import ApplicationStatus
+from app.routes.forms import form_field
 from app.services.applications import (
     APPLICATION_STATUS_ORDER,
     list_applications,
@@ -92,12 +93,10 @@ async def update_application_notes_card(
 ) -> HTMLResponse:
     """Save (or clear) one application's notes and render its card.
 
-    ``keep_blank_values`` matters: submitting an emptied textarea must
-    reach the service as an empty string so it clears the stored notes.
+    Blank submissions must survive parsing (form_field keeps them) so an
+    emptied textarea clears the stored notes.
     """
-    body = (await request.body()).decode()
-    form = parse_qs(body, keep_blank_values=True)
-    notes = form.get("notes", [""])[0]
+    notes = await form_field(request, "notes")
 
     try:
         application = update_application_notes(

@@ -7,6 +7,7 @@ Keeping database access here prevents HTML routes form becoming hard to read.
 from datetime import datetime
 
 from sqlalchemy import and_
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, func, select
 
 from app.models.application import Application, ApplicationListItem, ApplicationStatus
@@ -18,6 +19,10 @@ from app.services.blacklist import (
     blacklist_flags,
     is_job_blacklisted,
 )
+
+
+class DuplicateApplicationError(ValueError):
+    """The job already has an application (job_id is unique)."""
 
 
 APPLICATION_STATUS_ORDER = [
@@ -112,10 +117,6 @@ def update_application_notes(
     return updated
 
 
-class DuplicateApplicationError(ValueError):
-    """The job already has an application (job_id is unique)."""
-
-
 def create_application_draft(session: Session, *, job_id: int) -> Application:
     """The one sanctioned way to promote a job into an application draft.
 
@@ -140,7 +141,15 @@ def create_application_draft(session: Session, *, job_id: int) -> Application:
 
     draft = Application(job_id=job_id, status=ApplicationStatus.draft)
     session.add(draft)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as error:
+        # The unique job_id can still trip between the check and the
+        # insert (double-click); report it as the same duplicate error.
+        session.rollback()
+        raise DuplicateApplicationError(
+            f"job {job_id} already has an application"
+        ) from error
     session.refresh(draft)
     return draft
 
@@ -234,4 +243,5 @@ def _overlay_blacklist_flags(
         if flag is not None and flag.blacklisted:
             item.blacklisted = True
             item.blacklist_kind = flag.kind
+            item.blacklist_reason = flag.reason
     return items

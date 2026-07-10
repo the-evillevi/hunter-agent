@@ -56,3 +56,4 @@ class ApplicationListItem(SQLModel):
     resume_name: str | None = None
     blacklisted: bool = False
     blacklist_kind: str | None = None  # "job" or "company" when blacklisted
+    blacklist_reason: str | None = None

@@ -1,7 +1,5 @@
 """Route tests for the blacklist HTMX endpoints (HNTR-52)."""
 
-from fastapi.testclient import TestClient
-
 from app.main import app
 from app.services.blacklist import add_company_to_blacklist, add_job_to_blacklist
 

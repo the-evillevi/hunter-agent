@@ -7,8 +7,6 @@ base.html forces HTMX to swap them — so duplicates and unknown targets
 stay visible in place instead of failing silently.
 """
 
-from urllib.parse import parse_qs
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -23,6 +21,7 @@ from app.services.blacklist import (
     remove_company_from_blacklist,
     remove_job_from_blacklist,
 )
+from app.routes.forms import form_field
 from app.services.jobs import get_job_list_item, list_jobs
 from app.services.resume_crud import list_base_resumes
 
@@ -42,7 +41,7 @@ async def blacklist_job(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Block one job and re-render its row."""
-    reason = await _form_reason(request)
+    reason = await form_field(request, "reason")
     try:
         add_job_to_blacklist(session, job_id=job_id, reason=reason)
     except DuplicateBlacklistEntryError as error:
@@ -66,8 +65,8 @@ def unblacklist_job(
     try:
         remove_job_from_blacklist(session, job_id=job_id)
     except BlacklistTargetNotFoundError as error:
-        if get_job_list_item(session, job_id) is None:
-            raise HTTPException(status_code=404, detail=str(error)) from error
+        # _job_row_response 404s when the job itself is missing, so this
+        # 409 fragment only renders for real jobs without an entry.
         return _job_row_response(request, session, job_id, error=str(error))
     return _job_row_response(request, session, job_id)
 
@@ -83,7 +82,7 @@ async def blacklist_company(
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
     """Block a whole company and re-render the jobs list."""
-    reason = await _form_reason(request)
+    reason = await form_field(request, "reason")
     try:
         add_company_to_blacklist(session, company_id=company_id, reason=reason)
     except DuplicateBlacklistEntryError as error:
@@ -107,13 +106,8 @@ def unblacklist_company(
     try:
         remove_company_from_blacklist(session, company_id=company_id)
     except BlacklistTargetNotFoundError as error:
-        return _jobs_list_response(request, session, error=str(error), status=409)
+        return _jobs_list_response(request, session, error=str(error))
     return _jobs_list_response(request, session)
-
-
-async def _form_reason(request: Request) -> str | None:
-    body = (await request.body()).decode()
-    return parse_qs(body, keep_blank_values=True).get("reason", [None])[0]
 
 
 def _job_row_response(
@@ -143,7 +137,6 @@ def _jobs_list_response(
     session: Session,
     *,
     error: str | None = None,
-    status: int = 409,
 ) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
@@ -153,5 +146,5 @@ def _jobs_list_response(
             "base_resumes": list_base_resumes(session),
             "blacklist_error": error,
         },
-        status_code=status if error else 200,
+        status_code=409 if error else 200,
     )
