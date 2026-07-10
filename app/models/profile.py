@@ -57,6 +57,29 @@ class RemotiveProfileQuery(BaseModel):
         return value
 
 
+class AdzunaProfileQuery(BaseModel):
+    """Versioned profile query understood by the Adzuna adapter."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    what: str
+    where: str | None = None
+    category: str | None = None
+    full_time: bool | None = None
+    permanent: bool | None = None
+
+    @field_validator("what", "where", "category")
+    @classmethod
+    def text_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("text must not be blank")
+        return value
+
+
 class Profile(SQLModel, table=True):
     """Database-owned target role and matching thresholds."""
 

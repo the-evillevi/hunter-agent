@@ -42,6 +42,9 @@ def _profiles_context(
     remotive = session.exec(
         select(Source).where(func.lower(Source.name) == "remotive")
     ).first()
+    adzuna = session.exec(
+        select(Source).where(func.lower(Source.name) == "adzuna")
+    ).first()
     try:
         profiles = list_profiles(session)
     except ProfileError as profile_error:
@@ -50,6 +53,7 @@ def _profiles_context(
     return {
         "profiles": profiles,
         "companies": companies,
+        "adzuna": adzuna,
         "remotive": remotive,
         "remotive_categories": list(RemotiveCategory),
         "location_types": [value.value for value in LocationType],
@@ -251,14 +255,17 @@ def _profile_values(form: dict[str, list[str]]) -> dict:
 
 
 def _query_values(form: dict[str, list[str]]) -> dict:
-    raw_query: dict = {
-        "schema_version": 1,
-        "limit": _integer(form, "limit", "limit"),
-    }
-    for field in ("category", "search"):
+    raw_query: dict = {"schema_version": 1}
+    for field in ("category", "search", "what", "where"):
         value = _one(form, field, "").strip()
         if value:
             raw_query[field] = value
+    for field in ("full_time", "permanent"):
+        if _one(form, field, "") == "true":
+            raw_query[field] = True
+    limit = _one(form, "limit", "").strip()
+    if limit:
+        raw_query["limit"] = _integer(form, "limit", "limit")
     company_id = _one(form, "company_id", "").strip()
     if company_id:
         raw_query["company_id"] = _integer(form, "company_id", "company")
