@@ -24,6 +24,10 @@ DROP TABLE IF EXISTS profile_location_types;
 
 DROP TABLE IF EXISTS profile_keywords;
 
+DROP TABLE IF EXISTS score_layer_results;
+
+DROP TABLE IF EXISTS score_runs;
+
 DROP TABLE IF EXISTS jobs;
 
 DROP TABLE IF EXISTS profiles;
@@ -164,9 +168,55 @@ CREATE TABLE jobs (
   description TEXT,
   hash TEXT UNIQUE,
   scraped_at DATETIME NOT NULL,
-  score INT CHECK (score BETWEEN 1 AND 100),
+  score INT CHECK (score BETWEEN 0 AND 100),
   score_reasoning TEXT
 );
+
+-- Append-only scoring history (HNTR-10). One score_runs row per pipeline
+-- run of one job against one profile; jobs.score/score_reasoning stay a
+-- latest-result cache for the UI, never the source of truth.
+CREATE TABLE score_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id INTEGER NOT NULL REFERENCES jobs (id),
+  profile_id INTEGER NOT NULL REFERENCES profiles (id),
+  pipeline_version TEXT NOT NULL,
+  weights_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('scored', 'rejected', 'failed')),
+  score INT CHECK (score BETWEEN 0 AND 100),
+  explanation TEXT,
+  eligibility_reasons TEXT CHECK (
+    eligibility_reasons IS NULL OR json_valid(eligibility_reasons)
+  ), -- JSON array of {code, detail}
+  unknowns TEXT CHECK (unknowns IS NULL OR json_valid(unknowns)),
+  warnings TEXT CHECK (warnings IS NULL OR json_valid(warnings)),
+  duration_ms INT CHECK (duration_ms >= 0),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_score_runs_job_profile ON score_runs (job_id, profile_id, created_at);
+
+-- One row per registered layer per run: success rows carry scores and
+-- versions, skip/failure rows carry bounded failure diagnostics.
+CREATE TABLE score_layer_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  score_run_id INTEGER NOT NULL REFERENCES score_runs (id),
+  layer TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('success', 'skip', 'failure')),
+  algorithm_version TEXT,
+  model TEXT,
+  prompt_version TEXT,
+  score INT CHECK (score BETWEEN 0 AND 100),
+  explanation TEXT,
+  duration_ms INT CHECK (duration_ms >= 0),
+  details TEXT CHECK (details IS NULL OR json_valid(details)),
+  failure_code TEXT,
+  failure_detail TEXT CHECK (
+    failure_detail IS NULL OR length(failure_detail) <= 500
+  ),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_score_layer_results_run ON score_layer_results (score_run_id);
 
 CREATE TABLE applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
