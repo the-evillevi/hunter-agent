@@ -8,6 +8,7 @@ independent.
 
 import asyncio
 from datetime import datetime
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
@@ -16,6 +17,8 @@ import app.main as app_main
 import app.services.scheduler as scheduler_module
 from app.main import app
 from app.models.config import SchedulerConfig
+from app.models.pipeline_run import PipelineRun
+from app.services.pipeline import record_missed_pipeline_run
 from app.services.scheduler import (
     PIPELINE_JOB_ID_PREFIX,
     build_pipeline_scheduler,
@@ -171,3 +174,57 @@ def test_dashboard_panel_reports_disabled_scheduler(client) -> None:
 
     assert response.status_code == 200
     assert "Scheduler disabled" in response.text
+
+
+def test_missed_run_is_persisted_as_distinct_skip(session) -> None:
+    scheduled_at = datetime(2026, 7, 10, 8, 0)
+
+    run = record_missed_pipeline_run(
+        session,
+        scheduled_at=scheduled_at,
+        message="scheduled slot missed its misfire grace period",
+    )
+
+    assert run.status == "skipped_misfire"
+    assert run.trigger_type == "scheduled"
+    assert run.started_at == scheduled_at
+    assert "misfire grace period" in run.errors
+
+
+def test_missed_listener_records_the_scheduled_slot(monkeypatch) -> None:
+    scheduled_at = datetime(2026, 7, 10, 8, 0, tzinfo=ZoneInfo(TIMEZONE))
+    captured: dict = {}
+
+    def fake_record(session, *, scheduled_at, message) -> PipelineRun:
+        captured["scheduled_at"] = scheduled_at
+        captured["message"] = message
+        return PipelineRun(
+            trigger_type="scheduled",
+            status="skipped_misfire",
+            started_at=scheduled_at,
+        )
+
+    monkeypatch.setattr(scheduler_module, "record_missed_pipeline_run", fake_record)
+
+    scheduler_module._log_missed_run(
+        SimpleNamespace(
+            job_id=f"{PIPELINE_JOB_ID_PREFIX}-0800",
+            scheduled_run_time=scheduled_at,
+        )
+    )
+
+    assert captured["scheduled_at"] == scheduled_at.replace(tzinfo=None)
+    assert scheduled_at.isoformat() in captured["message"]
+
+
+def test_dashboard_panel_shows_misfire_status(client, session) -> None:
+    record_missed_pipeline_run(
+        session,
+        scheduled_at=datetime(2026, 7, 10, 8, 0),
+        message="missed",
+    )
+
+    response = client.get("/pipeline/partials/runs")
+
+    assert response.status_code == 200
+    assert "skipped (misfire)" in response.text

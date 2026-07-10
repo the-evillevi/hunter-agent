@@ -22,7 +22,9 @@ class PipelineRun(SQLModel, table=True):
             name="ck_pipeline_runs_trigger_type",
         ),
         CheckConstraint(
-            "status IN ('success', 'partial', 'failure', 'skipped_overlap')",
+            "status IN ("
+            "'success', 'partial', 'failure', 'skipped_overlap', 'skipped_misfire'"
+            ")",
             name="ck_pipeline_runs_status",
         ),
         CheckConstraint(

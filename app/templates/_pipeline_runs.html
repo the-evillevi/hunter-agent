@@ -35,6 +35,8 @@
                 <span class="badge badge-warning">partial</span>
               {% elif run.status == "skipped_overlap" %}
                 <span class="badge badge-ghost">skipped (overlap)</span>
+              {% elif run.status == "skipped_misfire" %}
+                <span class="badge badge-ghost">skipped (misfire)</span>
               {% else %}
                 <span class="badge badge-error">failure</span>
               {% endif %}

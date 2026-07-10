@@ -27,7 +27,7 @@ from sqlmodel import Session
 
 from app.db.database import engine
 from app.models.config import SchedulerConfig
-from app.services.pipeline import run_job_pipeline
+from app.services.pipeline import record_missed_pipeline_run, run_job_pipeline
 
 
 logger = logging.getLogger(__name__)
@@ -128,3 +128,19 @@ def _log_missed_run(event) -> None:
         "scheduled pipeline run %s missed its slot; waiting for the next one",
         event.job_id,
     )
+    scheduled_at = event.scheduled_run_time
+    if scheduled_at.tzinfo is not None:
+        scheduled_at = scheduled_at.replace(tzinfo=None)
+    message = (
+        f"scheduled slot {event.scheduled_run_time.isoformat()} missed its "
+        "misfire grace period"
+    )
+    try:
+        with Session(engine) as session:
+            record_missed_pipeline_run(
+                session,
+                scheduled_at=scheduled_at,
+                message=message,
+            )
+    except Exception:  # noqa: BLE001 - listeners must not crash the scheduler
+        logger.exception("failed to persist missed pipeline run %s", event.job_id)

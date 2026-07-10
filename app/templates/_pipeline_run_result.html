@@ -1,6 +1,6 @@
 <!-- One-run status fragment rendered after a manual pipeline trigger. -->
 <div
-  class="alert {% if summary.status == 'success' %}alert-success{% elif summary.status in ('partial', 'skipped_overlap') %}alert-warning{% else %}alert-error{% endif %} mt-4"
+  class="alert {% if summary.status == 'success' %}alert-success{% elif summary.status in ('partial', 'skipped_overlap', 'skipped_misfire') %}alert-warning{% else %}alert-error{% endif %} mt-4"
   role="status"
 >
   <div>
@@ -11,6 +11,8 @@
         Pipeline run completed with failures
       {% elif summary.status == "skipped_overlap" %}
         Pipeline run skipped: another run is already in progress
+      {% elif summary.status == "skipped_misfire" %}
+        Scheduled pipeline run skipped after missing its start window
       {% else %}
         Pipeline run failed
       {% endif %}
