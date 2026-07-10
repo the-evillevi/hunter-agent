@@ -2,11 +2,12 @@
 
 import json
 
-from sqlmodel import Session, select
+import pytest
+from sqlmodel import select
 
 from app.main import app
 from app.models.application import Application, ApplicationStatus
-from app.models.score_run import ScoreLayerResultRow, ScoreRun
+from app.models.score_run import ScoreLayerResultRow
 from app.services.blacklist import add_job_to_blacklist
 
 
@@ -158,6 +159,24 @@ def test_draft_action_rejects_duplicates_with_409_row(
 
     assert response.status_code == 409
     assert "already has" in response.text
+
+
+@pytest.mark.parametrize("run_status", [None, "rejected", "failed"])
+def test_draft_action_requires_a_successful_score(
+    run_status, client, session, create_job, create_score_run
+) -> None:
+    job = create_job(title="Not draftable")
+    if run_status is not None:
+        create_score_run(job, status=run_status, score=None)
+
+    response = client.post(f"/jobs/{job.id}/application")
+
+    assert response.status_code == 409
+    assert "must have a successful score" in response.text
+    application = session.exec(
+        select(Application).where(Application.job_id == job.id)
+    ).first()
+    assert application is None
 
 
 def test_draft_action_missing_job_is_404(client) -> None:

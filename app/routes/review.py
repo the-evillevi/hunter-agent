@@ -124,12 +124,20 @@ def start_application_draft(
 ) -> HTMLResponse:
     """Explicit user action: promote one reviewed job into a draft."""
     error: str | None = None
-    try:
-        create_application_draft(session, job_id=job_id)
-    except LookupError as lookup_error:
-        raise HTTPException(status_code=404, detail=str(lookup_error)) from lookup_error
-    except (BlacklistedJobError, DuplicateApplicationError) as guard_error:
-        error = str(guard_error)
+    item = get_review_queue_item(session, job_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} was not found")
+    if item.run_status != "scored":
+        error = f"job {job_id} must have a successful score before drafting"
+    else:
+        try:
+            create_application_draft(session, job_id=job_id)
+        except LookupError as lookup_error:  # pragma: no cover - checked above
+            raise HTTPException(
+                status_code=404, detail=str(lookup_error)
+            ) from lookup_error
+        except (BlacklistedJobError, DuplicateApplicationError) as guard_error:
+            error = str(guard_error)
     return _review_row_response(request, session, job_id, error=error)
 
 

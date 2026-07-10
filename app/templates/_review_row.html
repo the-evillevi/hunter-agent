@@ -50,7 +50,12 @@
     {% endif %}
   </td>
   <td>
-    {% if item.application_id is none and not item.blacklisted %}
+    {%
+      if
+      item.run_status == "scored"
+      and item.application_id is none
+      and not item.blacklisted
+    %}
       <button
         type="button"
         class="btn btn-primary btn-xs"
