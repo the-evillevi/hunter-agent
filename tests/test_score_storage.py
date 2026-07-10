@@ -9,6 +9,7 @@ import json
 from collections.abc import Callable
 
 import pytest
+from pydantic import ValidationError
 from sqlmodel import Session, select
 
 from app.models.eligibility import (
@@ -30,6 +31,7 @@ from app.services.score_storage import (
     latest_score_run,
     save_score_run,
 )
+from app.services import score_storage
 
 
 def eligible(unknowns: tuple[UnknownField, ...] = ()) -> EligibilityResult:
@@ -105,6 +107,9 @@ def test_scored_result_persists_run_layer_rows_and_cache(
     assert rows[0].status == "success"
     assert rows[0].algorithm_version == "1"
     assert rows[0].score == 80
+    keyword_details = json.loads(rows[0].details)
+    assert keyword_details["matched_title_terms"] == ["Python"]
+    assert keyword_details["title_score"] == 80
 
     session.refresh(job)
     assert job.score == 80
@@ -267,6 +272,10 @@ def test_llm_layer_extras_are_extracted_without_importing_layers(
     assert rows[0].model is None  # keyword layer has no model identity
     assert rows[1].model == "qwen2.5:7b"
     assert rows[1].prompt_version == "1"
+    llm_details = json.loads(rows[1].details)
+    assert llm_details["attempts"] == 1
+    assert llm_details["duration_ms"] == 1200
+    assert llm_details["guard_flag_codes"] == []
 
 
 def test_missing_job_rolls_back_the_whole_run(session: Session) -> None:
@@ -275,6 +284,79 @@ def test_missing_job_rolls_back_the_whole_run(session: Session) -> None:
 
     assert session.exec(select(ScoreRun)).all() == []
     assert session.exec(select(ScoreLayerResultRow)).all() == []
+
+
+def test_profile_mismatch_is_rejected_before_cache_or_history_changes(
+    session: Session,
+    create_job: Callable[..., Job],
+) -> None:
+    job = create_job(score=45)
+
+    with pytest.raises(ValueError, match="belongs to profile"):
+        save_score_run(
+            session,
+            job_id=job.id,
+            profile_id=job.profile_id + 1000,
+            result=scored_result(),
+        )
+
+    assert session.exec(select(ScoreRun)).all() == []
+    session.refresh(job)
+    assert job.score == 45
+
+
+def test_unexpected_layer_translation_failure_rolls_back_and_cleans_session(
+    session: Session,
+    create_job: Callable[..., Job],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    job = create_job(score=45)
+
+    def fail_layer_translation(score_run_id: int, outcome: LayerOutcome) -> None:
+        raise RuntimeError("translation failed")
+
+    monkeypatch.setattr(score_storage, "_layer_row", fail_layer_translation)
+
+    with pytest.raises(RuntimeError, match="translation failed"):
+        save_score_run(
+            session,
+            job_id=job.id,
+            profile_id=job.profile_id,
+            result=scored_result(),
+        )
+
+    assert session.exec(select(ScoreRun)).all() == []
+    assert session.exec(select(ScoreLayerResultRow)).all() == []
+    session.refresh(job)
+    assert job.score == 45
+
+
+def test_persistence_models_reject_internally_inconsistent_results() -> None:
+    with pytest.raises(ValidationError, match="cannot include a result"):
+        LayerOutcome(
+            layer="semantic",
+            status="failure",
+            result=keyword_outcome().result,
+            duration_ms=1,
+            failure_code="layer_error",
+        )
+
+    with pytest.raises(ValidationError, match="requires an ineligible"):
+        JobScoreResult(
+            status="rejected",
+            eligibility=eligible(),
+            explanation="not actually rejected",
+            pipeline_version="1",
+            weights_version="1",
+        )
+
+    with pytest.raises(ValidationError, match="same name"):
+        LayerOutcome(
+            layer="semantic",
+            status="success",
+            result=keyword_outcome().result,
+            duration_ms=1,
+        )
 
 
 def test_failed_run_is_persisted_without_touching_cache(
@@ -320,8 +402,8 @@ def test_sql_schema_replays_and_accepts_a_zero_score() -> None:
         connection.execute("PRAGMA foreign_keys = ON")
         connection.executescript(schema)
         connection.execute(
-            "INSERT INTO profiles (role_name, salary_min, location_type,"
-            " match_threshold, active) VALUES ('Role', 0, 'remote', 80, 1)"
+            "INSERT INTO profiles (role_name, salary_min, match_threshold, active)"
+            " VALUES ('Role', 0, 80, 1)"
         )
         connection.execute("INSERT INTO companies (name) VALUES ('ACME')")
         connection.execute("INSERT INTO locations (name) VALUES ('Remote')")
@@ -340,3 +422,8 @@ def test_sql_schema_replays_and_accepts_a_zero_score() -> None:
             "INSERT INTO score_layer_results (score_run_id, layer, status,"
             " score) VALUES (1, 'keyword', 'success', 0)"
         )
+        connection.commit()
+
+        # The reset script must also replay over populated history while
+        # foreign keys are enabled, which requires child-first drop order.
+        connection.executescript(schema)

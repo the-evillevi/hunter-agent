@@ -9,7 +9,7 @@ job shapes are defined once and consumed by services.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
 
 from app.models.eligibility import EligibilityResult
 
@@ -82,9 +82,23 @@ class LayerOutcome(BaseModel):
 
     @model_validator(mode="after")
     def success_must_carry_a_result(self) -> "LayerOutcome":
-        """A success outcome without a result would persist as a hollow row."""
-        if self.status == "success" and self.result is None:
-            raise ValueError("a successful layer outcome must include its result")
+        """Keep success and failure payloads mutually consistent."""
+        if self.status == "success":
+            if self.result is None:
+                raise ValueError("a successful layer outcome must include its result")
+            if self.result.layer != self.layer:
+                raise ValueError(
+                    "a layer outcome and its result must use the same name"
+                )
+            if self.failure_code is not None or self.failure_detail is not None:
+                raise ValueError("a successful layer outcome cannot include a failure")
+        else:
+            if self.result is not None:
+                raise ValueError("a skipped or failed layer cannot include a result")
+            if not self.failure_code:
+                raise ValueError(
+                    "a skipped or failed layer must include a failure code"
+                )
         return self
 
 
@@ -122,6 +136,21 @@ class JobScoreResult(BaseModel):
                 raise ValueError("a scored result must carry an aggregate score")
             if not self.layer_outcomes:
                 raise ValueError("a scored result must carry its layer outcomes")
+            if not any(outcome.status == "success" for outcome in self.layer_outcomes):
+                raise ValueError("a scored result must include a successful layer")
         elif self.score is not None:
             raise ValueError("only scored results may carry an aggregate score")
+        if self.status == "rejected":
+            if self.eligibility.eligible:
+                raise ValueError("a rejected result requires an ineligible decision")
+            if not self.eligibility.reasons:
+                raise ValueError("a rejected result requires a rejection reason")
+            if self.layer_outcomes:
+                raise ValueError("a rejected result cannot include layer outcomes")
+        elif not self.eligibility.eligible:
+            raise ValueError("scored and failed results require an eligible decision")
+        if self.status == "failed" and any(
+            outcome.status == "success" for outcome in self.layer_outcomes
+        ):
+            raise ValueError("a failed result cannot include a successful layer")
         return self

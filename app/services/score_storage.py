@@ -10,7 +10,6 @@ algorithm, model, and prompt versions over time.
 
 import json
 
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.models.job import Job
@@ -41,6 +40,10 @@ def save_score_run(
     job = session.get(Job, job_id)
     if job is None:
         raise ValueError(f"job {job_id} does not exist")
+    if job.profile_id != profile_id:
+        raise ValueError(
+            f"job {job_id} belongs to profile {job.profile_id}, not {profile_id}"
+        )
 
     run = ScoreRun(
         job_id=job_id,
@@ -75,9 +78,9 @@ def save_score_run(
             session.add(job)
 
         session.commit()
-    except IntegrityError:
-        # A constraint violation (for example a missing profile) must not
-        # leave a half-written run behind.
+    except Exception:
+        # Any failure after the run is staged must leave the session clean;
+        # otherwise a later caller could accidentally commit a partial run.
         session.rollback()
         raise
 
@@ -112,6 +115,20 @@ def _layer_row(score_run_id: int, outcome: LayerOutcome) -> ScoreLayerResultRow:
     getattr, so storage never needs to import any layer service module.
     """
     layer_result = outcome.result
+    details = None
+    if layer_result is not None:
+        details_payload = layer_result.model_dump(
+            mode="json",
+            exclude={
+                "layer",
+                "algorithm_version",
+                "score",
+                "explanation",
+                "model",
+                "prompt_version",
+            },
+        )
+        details = json.dumps(details_payload, allow_nan=False, sort_keys=True)
     return ScoreLayerResultRow(
         score_run_id=score_run_id,
         layer=outcome.layer,
@@ -124,6 +141,7 @@ def _layer_row(score_run_id: int, outcome: LayerOutcome) -> ScoreLayerResultRow:
         score=layer_result.score if layer_result is not None else None,
         explanation=layer_result.explanation if layer_result is not None else None,
         duration_ms=outcome.duration_ms,
+        details=details,
         failure_code=outcome.failure_code,
         failure_detail=(
             outcome.failure_detail[:MAX_FAILURE_DETAIL_CHARS]

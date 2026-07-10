@@ -24,11 +24,11 @@ DROP TABLE IF EXISTS profile_location_types;
 
 DROP TABLE IF EXISTS profile_keywords;
 
-DROP TABLE IF EXISTS jobs;
-
 DROP TABLE IF EXISTS score_layer_results;
 
 DROP TABLE IF EXISTS score_runs;
+
+DROP TABLE IF EXISTS jobs;
 
 DROP TABLE IF EXISTS profiles;
 
@@ -184,9 +184,11 @@ CREATE TABLE score_runs (
   status TEXT NOT NULL CHECK (status IN ('scored', 'rejected', 'failed')),
   score INT CHECK (score BETWEEN 0 AND 100),
   explanation TEXT,
-  eligibility_reasons TEXT, -- JSON array of {code, detail}
-  unknowns TEXT, -- JSON array of unchecked constraint names
-  warnings TEXT, -- JSON array of human-readable warnings
+  eligibility_reasons TEXT CHECK (
+    eligibility_reasons IS NULL OR json_valid(eligibility_reasons)
+  ), -- JSON array of {code, detail}
+  unknowns TEXT CHECK (unknowns IS NULL OR json_valid(unknowns)),
+  warnings TEXT CHECK (warnings IS NULL OR json_valid(warnings)),
   duration_ms INT CHECK (duration_ms >= 0),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -206,10 +208,15 @@ CREATE TABLE score_layer_results (
   score INT CHECK (score BETWEEN 0 AND 100),
   explanation TEXT,
   duration_ms INT CHECK (duration_ms >= 0),
+  details TEXT CHECK (details IS NULL OR json_valid(details)),
   failure_code TEXT,
-  failure_detail TEXT,
+  failure_detail TEXT CHECK (
+    failure_detail IS NULL OR length(failure_detail) <= 500
+  ),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_score_layer_results_run ON score_layer_results (score_run_id);
 
 CREATE TABLE applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
