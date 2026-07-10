@@ -1,10 +1,14 @@
+from contextlib import asynccontextmanager
 from importlib import metadata
+import logging
+import os
 import tomllib
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.config import PROJECT_ROOT
+from app.config import PROJECT_ROOT, load_config
+from app.services.scheduler import build_pipeline_scheduler
 from app.routes import (
     applications,
     companies,
@@ -40,10 +44,42 @@ def app_version() -> str:
         )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start the pipeline scheduler with the app and stop it cleanly.
+
+    ``HUNTER_SCHEDULER_ENABLED=0`` skips scheduling entirely — the test
+    suite sets it so TestClient startups never boot a real scheduler.
+    Reusing an already-attached scheduler keeps startup idempotent if the
+    lifespan ever runs twice in one process (development reload quirks).
+    """
+    scheduler = getattr(app.state, "scheduler", None)
+    if scheduler is None and os.environ.get("HUNTER_SCHEDULER_ENABLED", "1") != "0":
+        try:
+            scheduler = build_pipeline_scheduler(load_config().scheduler)
+            if scheduler is not None:
+                scheduler.start()
+        except Exception:
+            # A broken config must not make the whole dashboard
+            # unreachable; the app serves and the scheduler stays off.
+            logging.getLogger(__name__).exception(
+                "pipeline scheduler failed to start; continuing without it"
+            )
+            scheduler = None
+    app.state.scheduler = scheduler
+    try:
+        yield
+    finally:
+        if scheduler is not None and getattr(scheduler, "running", True):
+            scheduler.shutdown(wait=False)
+        app.state.scheduler = None
+
+
 # Swagger UI (/docs) and /openapi.json document the JSON API surface only.
 # HTML and HTMX routes are excluded via include_in_schema=False because their
 # audience is the browser UI, not API consumers; see the README for the policy.
 app = FastAPI(
+    lifespan=lifespan,
     title="Hunter Agent",
     description=(
         "Job application assistant. This API exposes the automation-friendly "

@@ -61,7 +61,9 @@ from app.services.sources import (
 
 PipelineTrigger = Literal["manual", "scheduled"]
 PipelineStage = Literal["selection", "fetch", "ingest", "scoring", "run"]
-PipelineStatus = Literal["success", "partial", "failure", "skipped_overlap"]
+PipelineStatus = Literal[
+    "success", "partial", "failure", "skipped_overlap", "skipped_misfire"
+]
 
 # Bounded error storage keeps run rows readable without capturing
 # tracebacks; anything deeper belongs in logs.
@@ -123,7 +125,7 @@ class PipelineRunSummary(BaseModel):
         """Map the run outcome to an HTTP status suitable for automation."""
         if self.status in ("success", "partial"):
             return 200
-        if self.status == "skipped_overlap":
+        if self.status in ("skipped_overlap", "skipped_misfire"):
             return 409
         return 500
 
@@ -271,6 +273,20 @@ def list_recent_pipeline_runs(session: Session, limit: int = 10) -> list[Pipelin
         .limit(limit)
     )
     return list(session.exec(statement).all())
+
+
+def record_missed_pipeline_run(
+    session: Session,
+    *,
+    scheduled_at: datetime,
+    message: str,
+) -> PipelineRun:
+    """Persist a scheduled slot that APScheduler could not start in time."""
+    summary = PipelineRunSummary(trigger_type="scheduled", started_at=scheduled_at)
+    summary.status = "skipped_misfire"
+    summary.finished_at = scheduled_at
+    summary.add_error("run", message)
+    return _persist_run(session, summary)
 
 
 async def _run_stages(

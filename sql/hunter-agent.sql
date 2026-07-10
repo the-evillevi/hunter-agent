@@ -230,7 +230,13 @@ CREATE TABLE pipeline_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_type TEXT NOT NULL CHECK (trigger_type IN ('manual', 'scheduled')),
   status TEXT NOT NULL CHECK (
-    status IN ('success', 'partial', 'failure', 'skipped_overlap')
+    status IN (
+      'success',
+      'partial',
+      'failure',
+      'skipped_overlap',
+      'skipped_misfire'
+    )
   ),
   started_at DATETIME NOT NULL,
   finished_at DATETIME,

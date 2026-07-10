@@ -10,6 +10,7 @@ from app.services.applications import APPLICATION_STATUS_ORDER, list_application
 from app.services.dashboard import get_dashboard_metrics
 from app.services.pipeline import list_recent_pipeline_runs
 from app.services.resume_crud import list_recent_tailor_runs
+from app.services.scheduler import next_scheduled_run_time_for
 
 
 router = APIRouter()
@@ -28,5 +29,6 @@ def home(request: Request, session: Session = Depends(get_session)) -> HTMLRespo
             "application_statuses": APPLICATION_STATUS_ORDER,
             "recent_tailor_runs": list_recent_tailor_runs(session),
             "pipeline_runs": list_recent_pipeline_runs(session),
+            "next_run_time": next_scheduled_run_time_for(request.app.state),
         },
     )
