@@ -1,0 +1,89 @@
+<!-- Paginated review queue fragment; filters and sort ride every URL. -->
+{% if review_page.is_out_of_range %}
+  <p class="text-base-content/60 text-sm">
+    Page {{ review_page.page }} is out of range.
+    {% if previous_url %}<a class="link" href="{{ previous_url }}"
+      >Back</a
+    >{% endif %}
+  </p>
+{% elif review_page.items %}
+  <div class="overflow-x-auto">
+    <table class="table-zebra table text-sm">
+      <thead>
+        <tr>
+          <th>Role</th>
+          <th>Company</th>
+          <th>Location</th>
+          <th>
+            <a
+              class="link-hover link"
+              hx-get="{{ sort_score_url }}"
+              hx-target="#review-table"
+              hx-swap="innerHTML"
+              href="#"
+            >
+              Score{% if sort == "score" %}{{ "↓" if desc == "1" else "↑" }}{% endif %}
+            </a>
+          </th>
+          <th>State</th>
+          <th>
+            <a
+              class="link-hover link"
+              hx-get="{{ sort_status_url }}"
+              hx-target="#review-table"
+              hx-swap="innerHTML"
+              href="#"
+            >
+              Outcome{% if sort == "status" %}{{ "↓" if desc == "1" else "↑" }}{% endif %}
+            </a>
+          </th>
+          <th></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in review_page.items %}
+          {% include "_review_row.html" %}
+          <tr id="review-detail-{{ item.job_id }}" hidden></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-4 flex items-center justify-between">
+    <p class="text-base-content/60 text-sm">
+      Page {{ review_page.page }} of {{ review_page.total_pages }} ·
+      {{ review_page.total }} jobs
+    </p>
+    <div class="join">
+      <button
+        type="button"
+        class="btn join-item btn-sm"
+        {% if previous_partial_url %}
+          hx-get="{{ previous_partial_url }}" hx-target="#review-table"
+          hx-swap="innerHTML"
+        {% else %}
+          disabled
+        {% endif %}
+      >
+        Previous
+      </button>
+      <button
+        type="button"
+        class="btn join-item btn-sm"
+        {% if next_partial_url %}
+          hx-get="{{ next_partial_url }}" hx-target="#review-table"
+          hx-swap="innerHTML"
+        {% else %}
+          disabled
+        {% endif %}
+      >
+        Next
+      </button>
+    </div>
+  </div>
+{% else %}
+  <p class="text-base-content/60 text-sm">
+    No jobs match these filters. Run the pipeline or relax the minimum score.
+  </p>
+{% endif %}

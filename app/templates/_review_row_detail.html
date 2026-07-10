@@ -1,0 +1,86 @@
+<!-- Layer evidence for one job's latest score run; swaps the hidden
+     placeholder row of the same id. -->
+<tr id="review-detail-{{ job_id }}">
+  <td colspan="8" class="bg-base-200/50">
+    {% if detail is none %}
+      <p class="text-base-content/60 text-sm">
+        This job has never been scored.
+      </p>
+    {% else %}
+      <div class="flex flex-col gap-2 p-2 text-sm">
+        <p class="text-base-content/60">
+          Latest run #{{ detail.run.id }} · status {{ detail.run.status }} ·
+          pipeline v{{ detail.run.pipeline_version }} · weights
+          v{{ detail.run.weights_version }} ·
+          {{ detail.run.created_at.strftime("%Y-%m-%d %H:%M") }}
+        </p>
+
+        {% if detail.run.explanation %}
+          <p>{{ detail.run.explanation }}</p>
+        {% endif %}
+
+        {% if detail.layers %}
+          <table class="table-xs table">
+            <thead>
+              <tr>
+                <th>Layer</th>
+                <th>Status</th>
+                <th>Score</th>
+                <th>Version / model</th>
+                <th>Explanation</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for layer in detail.layers %}
+                <tr>
+                  <td>{{ layer.layer }}</td>
+                  <td>{{ layer.status }}</td>
+                  <td>
+                    {% if layer.score is not none %}{{ layer.score }}{% endif %}
+                  </td>
+                  <td>
+                    {{ layer.algorithm_version or "" }}
+                    {% if layer.model %}· {{ layer.model }}{% endif %}
+                    {% if layer.prompt_version %}
+                      · prompt v{{ layer.prompt_version }}
+                    {% endif %}
+                  </td>
+                  <td>
+                    {{ layer.explanation or "" }}
+                    {% if layer.failure_detail %}
+                      <span class="text-error">{{ layer.failure_detail }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endif %}
+
+        {% if detail.eligibility_reasons %}
+          <p class="text-error">
+            Rejected:
+            {% for reason in detail.eligibility_reasons %}
+              {{ reason.code }}
+              ({{ reason.detail }}){{ ", " if not loop.last }}
+            {% endfor %}
+          </p>
+        {% endif %}
+
+        {% if detail.warnings %}
+          <ul class="text-warning list-disc pl-5">
+            {% for warning in detail.warnings %}
+              <li>{{ warning }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        {% if detail.unknowns %}
+          <p class="text-base-content/60">
+            Unchecked: {{ detail.unknowns | join(", ") }}
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </td>
+</tr>

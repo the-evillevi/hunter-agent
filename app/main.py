@@ -14,6 +14,7 @@ from app.routes import (
     jobs,
     profiles,
     resumes,
+    review,
     sources,
 )
 
@@ -77,3 +78,4 @@ app.include_router(sources.router)
 app.include_router(companies.router)
 app.include_router(resumes.router)
 app.include_router(blacklist.router)
+app.include_router(review.router)
