@@ -7,12 +7,12 @@ from the shared ``make_profile`` factory fixture in ``conftest.py``.
 
 from collections.abc import Callable
 
-from app.models.config import ProfileConfig
 from app.models.eligibility import EligibilityReasonCode, UnknownField
 from app.services.eligibility import check_eligibility, infer_location_type
+from app.services.profiles import ProfileDetail
 
 
-MakeProfile = Callable[..., ProfileConfig]
+MakeProfile = Callable[..., ProfileDetail]
 
 
 def test_clean_job_passes_with_no_reasons(make_profile: MakeProfile) -> None:
@@ -74,6 +74,27 @@ def test_excluded_keyword_does_not_match_partial_words(
     )
 
     assert result.eligible
+
+
+def test_missing_description_is_unknown_when_exclusions_need_it(
+    make_profile: MakeProfile,
+) -> None:
+    constrained = check_eligibility(
+        title="Python Developer",
+        description=None,
+        location="Remote",
+        profile=make_profile(exclude_keywords=["security clearance"]),
+    )
+    unconstrained = check_eligibility(
+        title="Python Developer",
+        description=None,
+        location="Remote",
+        profile=make_profile(),
+    )
+
+    assert constrained.eligible
+    assert UnknownField.description in constrained.unknowns
+    assert UnknownField.description not in unconstrained.unknowns
 
 
 def test_multiple_reasons_are_all_collected(make_profile: MakeProfile) -> None:

@@ -7,7 +7,8 @@ mismatch and no model work is wasted on it. This service has no network,
 model, or persistence dependency.
 """
 
-from app.models.config import ProfileConfig
+from typing import Protocol
+
 from app.models.eligibility import (
     EligibilityReason,
     EligibilityReasonCode,
@@ -31,11 +32,30 @@ LOCATION_TYPE_PHRASES: dict[str, tuple[str, ...]] = {
 }
 
 
-def allowed_location_types(profile: ProfileConfig) -> frozenset[str]:
-    """Normalize the profile's single-or-list location_type field."""
-    if isinstance(profile.location_type, str):
-        return frozenset((profile.location_type,))
-    return frozenset(profile.location_type)
+class EligibilityProfileRow(Protocol):
+    """Persisted profile fields used by deterministic eligibility checks."""
+
+    role_name: str
+    salary_min: int
+
+
+class EligibilityLocationType(Protocol):
+    """Enum-like persisted location value used by ``ProfileDetail``."""
+
+    value: str
+
+
+class EligibilityProfile(Protocol):
+    """Structural view of the database-backed profile aggregate."""
+
+    profile: EligibilityProfileRow
+    location_types: tuple[EligibilityLocationType, ...]
+    exclude_keywords: tuple[str, ...]
+
+
+def allowed_location_types(profile: EligibilityProfile) -> frozenset[str]:
+    """Return normalized work arrangements from a persisted profile."""
+    return frozenset(location_type.value for location_type in profile.location_types)
 
 
 def infer_location_type(location: str | None) -> str | None:
@@ -64,7 +84,7 @@ def check_eligibility(
     title: str | None,
     description: str | None,
     location: str | None,
-    profile: ProfileConfig,
+    profile: EligibilityProfile,
 ) -> EligibilityResult:
     """Decide whether one job passes a profile's hard constraints.
 
@@ -86,11 +106,13 @@ def check_eligibility(
                     detail=term,
                 )
             )
+    if profile.exclude_keywords and not description:
+        unknowns.append(UnknownField.description)
 
     # Listings carry no structured salary today, so a configured salary
     # floor can only be surfaced as unchecked; salary_min == 0 means the
     # filter is disabled and there is nothing left unchecked.
-    if profile.salary_min > 0:
+    if profile.profile.salary_min > 0:
         unknowns.append(UnknownField.salary)
 
     inferred_location_type = infer_location_type(location)
@@ -108,6 +130,6 @@ def check_eligibility(
         eligible=not reasons,
         reasons=tuple(reasons),
         unknowns=tuple(unknowns),
-        profile_role_name=profile.role_name,
+        profile_role_name=profile.profile.role_name,
         algorithm_version=ELIGIBILITY_ALGORITHM_VERSION,
     )

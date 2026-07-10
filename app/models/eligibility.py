@@ -29,6 +29,7 @@ class UnknownField(StrEnum):
 
     salary = "salary"
     location_type = "location_type"
+    description = "description"
 
 
 class EligibilityReason(BaseModel):
