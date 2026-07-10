@@ -19,6 +19,7 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.models.resume import SectionType
+from app.services.ai.errors import AIProviderError
 from app.services.jobs import list_jobs
 from app.services.resume_compiler import ResumeCompiler, ResumeExportError
 from app.services.resume_crud import (
@@ -193,7 +194,7 @@ def resume_detail_page(
     )
 
 
-def _render_tailoring_result(
+async def _render_tailoring_result(
     request: Request,
     session: Session,
     *,
@@ -202,11 +203,18 @@ def _render_tailoring_result(
 ) -> HTMLResponse:
     """Run one tailoring pass and render the shared result fragment."""
     try:
-        variant = ResumeTailor().tailor_to_job(
+        variant = await ResumeTailor().tailor_to_job(
             session, base_resume_id=base_resume_id, job_id=job_id
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except AIProviderError as error:
+        return templates.TemplateResponse(
+            request,
+            "_resume_tailoring_error.html",
+            {"provider": error.provider, "message": str(error)},
+            status_code=503,
+        )
 
     detail = get_resume_detail(session, variant.id)
     kept_items = [item for section in detail.sections for item in section.items]
@@ -241,7 +249,7 @@ async def tailor_resume(
 ) -> HTMLResponse:
     """Tailor from the resume detail page: the job comes from the form."""
     job_id = _form_int((await request.body()).decode(), "job_id")
-    return _render_tailoring_result(
+    return await _render_tailoring_result(
         request, session, base_resume_id=resume_id, job_id=job_id
     )
 
@@ -254,7 +262,7 @@ async def tailor_resume_for_job(
 ) -> HTMLResponse:
     """Tailor from the jobs list: the base resume comes from the form."""
     resume_id = _form_int((await request.body()).decode(), "resume_id")
-    return _render_tailoring_result(
+    return await _render_tailoring_result(
         request, session, base_resume_id=resume_id, job_id=job_id
     )
 

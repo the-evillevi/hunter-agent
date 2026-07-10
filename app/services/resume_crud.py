@@ -280,9 +280,7 @@ def update_section_order(
     return section
 
 
-def list_recent_tailor_runs(
-    session: Session, limit: int = 5
-) -> list[RecentTailorRun]:
+def list_recent_tailor_runs(session: Session, limit: int = 5) -> list[RecentTailorRun]:
     """Return the newest tailoring runs for the dashboard card."""
     statement = (
         select(
@@ -292,6 +290,8 @@ def list_recent_tailor_runs(
             Job.id,
             Job.title,
             ResumeTailorRun.model,
+            ResumeTailorRun.generator_model,
+            ResumeTailorRun.critic_model,
             ResumeTailorRun.duration_ms,
             ResumeTailorRun.created_at,
         )
@@ -309,7 +309,11 @@ def list_recent_tailor_runs(
             resume_name=resume_name,
             job_id=job_id,
             job_title=job_title or "Untitled job",
-            model=model,
+            model=(
+                f"{generator_model} → {critic_model}"
+                if generator_model and critic_model
+                else model
+            ),
             duration_ms=duration_ms,
             created_at=created_at,
         )
@@ -320,6 +324,8 @@ def list_recent_tailor_runs(
             job_id,
             job_title,
             model,
+            generator_model,
+            critic_model,
             duration_ms,
             created_at,
         ) in session.exec(statement).all()

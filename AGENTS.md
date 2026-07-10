@@ -17,7 +17,7 @@ The roadmap is tracked in Linear. Use your Linear skill to access the Hunter Tea
 Decided 2026-07-07 (recorded on Linear HNTR-9/12/14/50/55/56): the pipeline is deterministic filters → local models → cloud models, split by workload economics.
 
 - **Job scoring is fully local.** Eligibility filters and keyword scoring are deterministic; the LLM score layer and semantic (embeddings) layer run on Ollama. Scoring is high-volume/low-stakes, so cloud frontier models were evaluated and rejected there on cost.
-- **CV tailoring uses cloud frontier models** in a generator-critic flow: Claude Opus 4.8 (`claude-opus-4-8`) generates, GPT 5.5 critiques. The pairing lives in configuration (any provider behind the completion protocol can fill either role), and each draft records which models produced it as audit metadata. A four-pairing A/B experiment was considered and cut (2026-07-08): at a few CVs per week it would never reach a meaningful sample size.
+- **CV tailoring uses OpenAI cloud models** in a generator-critic flow. GPT 5.5 (`gpt-5.5`) fills both roles by default, with each role independently configurable to another OpenAI model and overridable per run. Each draft records which models produced it as audit metadata. Anthropic/Opus was removed from the plan on 2026-07-10 to keep the low-volume workflow on one cloud provider.
 - **All model access goes through the provider-neutral completion protocol** (HNTR-14) — feature code must not import a provider client directly. Cloud API keys come from environment variables only, never `config.toml` or commits.
 - **Untrusted job text entering any generative model** must pass through the prompt-guarding boundary (HNTR-9) first.
 
