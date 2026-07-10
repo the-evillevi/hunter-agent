@@ -124,6 +124,9 @@ class ResumeItem(SQLModel, table=True):
     content: str
     relevance_score: float | None = None
     score_reasoning: str | None = None
+    # True when the score is a neutral placeholder because the scoring model
+    # was unavailable; the UI must not present it as a real judgement.
+    score_is_fallback: bool = False
     order_idx: int = 0
 
     def content_dict(self) -> dict:
@@ -154,7 +157,43 @@ class ResumeTailorRun(SQLModel, table=True):
     job_id: int = Field(foreign_key="jobs.id")
     model: str
     prompt_version: str
+    # Wall-clock time of the whole run (scoring plus variant writes).
+    duration_ms: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class ResumeTailorRunItem(SQLModel, table=True):
+    """Audit detail: one scored fact inside a run, whether kept or dropped.
+
+    Items below the relevance threshold never reach the variant, so this
+    table is the only place their scores and reasoning survive for
+    analytics. ``item_content`` is a JSON snapshot because base items can
+    be edited or deleted after the run.
+    """
+
+    __tablename__ = "resume_tailor_run_items"
+    __table_args__ = (
+        CheckConstraint(
+            "score IS NULL OR score BETWEEN 0 AND 100",
+            name="ck_resume_tailor_run_items_score",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("resume_tailor_runs.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
+    section_type: SectionType
+    item_content: str
+    score: float | None = None
+    reasoning: str | None = None
+    is_fallback: bool = False
+    kept: bool
 
 
 class ResumeExportProfile(SQLModel, table=True):
@@ -205,6 +244,7 @@ class ResumeItemDetail(SQLModel):
     content: dict
     relevance_score: float | None
     score_reasoning: str | None
+    score_is_fallback: bool = False
     order_idx: int
 
 
