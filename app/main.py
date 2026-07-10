@@ -11,6 +11,7 @@ from app.config import PROJECT_ROOT, load_config
 from app.services.scheduler import build_pipeline_scheduler
 from app.routes import (
     applications,
+    blacklist,
     companies,
     dashboard,
     health,
@@ -18,6 +19,7 @@ from app.routes import (
     pipeline,
     profiles,
     resumes,
+    review,
     sources,
 )
 
@@ -116,4 +118,6 @@ app.include_router(profiles.router)
 app.include_router(sources.router)
 app.include_router(companies.router)
 app.include_router(resumes.router)
+app.include_router(blacklist.router)
+app.include_router(review.router)
 app.include_router(pipeline.router)

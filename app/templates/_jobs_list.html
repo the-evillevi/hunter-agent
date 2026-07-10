@@ -1,3 +1,9 @@
+{% if blacklist_error %}
+  <div class="alert alert-error mb-2 text-sm" role="alert">
+    {{ blacklist_error }}
+  </div>
+{% endif %}
+
 {% if jobs %}
   <div class="overflow-x-auto">
     <table class="table-zebra table">
@@ -8,60 +14,14 @@
           <th>Location</th>
           <th>Source</th>
           <th>Score</th>
+          <th>Blacklist</th>
           <th>Tailor resume</th>
           <th></th>
         </tr>
       </thead>
       <tbody>
         {% for job in jobs %}
-          <tr>
-            <td class="font-semibold">{{ job.title }}</td>
-            <td>{{ job.company }}</td>
-            <td>{{ job.location }}</td>
-            <td>{{ job.source }}</td>
-            <td>
-              {% if job.score is not none %}
-                <span class="badge badge-outline">{{ job.score }}/100</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if base_resumes %}
-                <form
-                  class="flex items-center gap-1"
-                  hx-post="/jobs/{{ job.id }}/tailor"
-                  hx-target="#tailor-result-{{ job.id }}"
-                  hx-swap="innerHTML"
-                >
-                  <select
-                    class="select select-bordered select-sm"
-                    name="resume_id"
-                    required
-                  >
-                    {% for resume in base_resumes %}
-                      <option value="{{ resume.id }}">{{ resume.name }}</option>
-                    {% endfor %}
-                  </select>
-                  <button type="submit" class="btn btn-primary btn-sm">
-                    Tailor
-                  </button>
-                </form>
-                <div id="tailor-result-{{ job.id }}"></div>
-              {% else %}
-                <a class="link text-sm" href="/resumes">Add a resume first</a>
-              {% endif %}
-            </td>
-            <td>
-              {% if job.url %}
-                <a
-                  class="btn btn-ghost btn-sm"
-                  href="{{ job.url }}"
-                  target="_blank"
-                  rel="noreferrer"
-                  >Open</a
-                >
-              {% endif %}
-            </td>
-          </tr>
+          {% include "_job_row.html" %}
         {% endfor %}
       </tbody>
     </table>

@@ -8,11 +8,23 @@ decorator at a time and use the failing assertion as your next clue.
 from pathlib import Path
 import sqlite3
 
+import pytest
 from sqlmodel import Session
 
 from app.models.application import ApplicationStatus
 from app.routes import applications as applications_route
-from app.services.applications import list_applications, update_application_status
+from app.services.applications import (
+    DuplicateApplicationError,
+    create_application_draft,
+    list_applications,
+    update_application_notes,
+    update_application_status,
+)
+from app.services.blacklist import (
+    BlacklistedJobError,
+    add_company_to_blacklist,
+    add_job_to_blacklist,
+)
 
 
 def test_list_applications_returns_fixture_application(
@@ -344,3 +356,112 @@ def test_schema_and_seed_scripts_rebuild_database(tmp_path: Path) -> None:
         "source",
         "source_url",
     }.issubset(history_columns)
+
+
+def test_update_application_notes_saves_edits_and_clears(
+    session, create_application
+) -> None:
+    application = create_application(notes="old note")
+
+    updated = update_application_notes(
+        session, application_id=application.id, notes="  follow up Friday  "
+    )
+    assert updated.notes == "follow up Friday"
+
+    cleared = update_application_notes(
+        session, application_id=application.id, notes="   "
+    )
+    assert cleared.notes is None
+
+
+def test_update_application_notes_missing_application_raises(session) -> None:
+    with pytest.raises(LookupError):
+        update_application_notes(session, application_id=999, notes="x")
+
+
+def test_notes_patch_route_saves_and_renders_card(
+    client, session, create_application
+) -> None:
+    application = create_application(notes=None)
+
+    response = client.patch(
+        f"/applications/{application.id}/notes",
+        data={"notes": "call recruiter"},
+    )
+
+    assert response.status_code == 200
+    assert "call recruiter" in response.text
+    assert f"APP-{application.id}" in response.text
+
+
+def test_notes_patch_route_clears_notes_without_reload(
+    client, session, create_application
+) -> None:
+    application = create_application(notes="stale")
+
+    response = client.patch(
+        f"/applications/{application.id}/notes",
+        data={"notes": ""},
+    )
+
+    assert response.status_code == 200
+    assert "stale" not in response.text
+
+
+def test_notes_patch_route_missing_application_is_404(client) -> None:
+    assert (
+        client.patch("/applications/999/notes", data={"notes": "x"}).status_code == 404
+    )
+
+
+def test_create_application_draft_happy_path(session, create_job) -> None:
+    job = create_job()
+
+    draft = create_application_draft(session, job_id=job.id)
+
+    assert draft.id is not None
+    assert draft.status == ApplicationStatus.draft
+    assert draft.applied_at is None
+
+
+def test_create_application_draft_rejects_blacklisted_job(session, create_job) -> None:
+    job = create_job()
+    add_job_to_blacklist(session, job_id=job.id, reason="scam")
+
+    with pytest.raises(BlacklistedJobError):
+        create_application_draft(session, job_id=job.id)
+
+
+def test_create_application_draft_rejects_company_blacklisted_job(
+    session, create_job
+) -> None:
+    job = create_job(company_name="Blocked Corp")
+    add_company_to_blacklist(session, company_id=job.company_id)
+
+    with pytest.raises(BlacklistedJobError):
+        create_application_draft(session, job_id=job.id)
+
+
+def test_create_application_draft_rejects_duplicates_and_missing_job(
+    session, create_job, create_application
+) -> None:
+    job = create_job()
+    create_application(job=job)
+
+    with pytest.raises(DuplicateApplicationError):
+        create_application_draft(session, job_id=job.id)
+    with pytest.raises(LookupError):
+        create_application_draft(session, job_id=999)
+
+
+def test_application_card_shows_blacklist_badge(
+    client, session, create_job, create_application
+) -> None:
+    job = create_job()
+    create_application(job=job)
+    add_job_to_blacklist(session, job_id=job.id)
+
+    response = client.get("/applications/partials/list")
+
+    assert response.status_code == 200
+    assert "Blacklisted (job)" in response.text

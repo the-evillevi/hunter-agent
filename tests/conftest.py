@@ -24,6 +24,7 @@ from sqlmodel import SQLModel, Session, create_engine, select
 from app.db.database import get_session
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.blacklist import Blacklist  # noqa: F401
 from app.models.company import Company
 from app.models.job import Job
 from app.models.location import Location
@@ -174,6 +175,36 @@ def create_job(session: Session) -> Callable[..., Job]:
         return job
 
     return _create_job
+
+
+@pytest.fixture()
+def create_score_run(session: Session) -> Callable[..., "ScoreRun"]:
+    """Insert one score run for a job, shared by review-queue tests."""
+
+    def _create_score_run(
+        job,
+        *,
+        status: str = "scored",
+        score: int | None = 80,
+        warnings: list[str] | None = None,
+    ) -> ScoreRun:
+        import json
+
+        run = ScoreRun(
+            job_id=job.id,
+            profile_id=job.profile_id,
+            pipeline_version="1",
+            weights_version="1",
+            status=status,
+            score=score if status == "scored" else None,
+            warnings=json.dumps(warnings or []),
+        )
+        session.add(run)
+        session.commit()
+        session.refresh(run)
+        return run
+
+    return _create_score_run
 
 
 @pytest.fixture()

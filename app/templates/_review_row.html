@@ -1,0 +1,75 @@
+<!-- One review-queue row plus its (initially hidden) detail row. -->
+<tr id="review-row-{{ item.job_id }}">
+  <td class="font-semibold">{{ item.title }}</td>
+  <td>{{ item.company }}</td>
+  <td>{{ item.location }}</td>
+  <td>
+    {% if item.score is not none %}
+      <span class="badge badge-outline">{{ item.score }}/100</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if item.state == "scored" %}
+      <span class="badge badge-success badge-outline">scored</span>
+    {% elif item.state == "ineligible" %}
+      <span class="badge badge-error badge-outline">ineligible</span>
+    {% elif item.state == "failed" %}
+      <span class="badge badge-warning badge-outline">failed</span>
+    {% elif item.state == "drafted" %}
+      <span class="badge badge-info badge-outline">drafted</span>
+    {% elif item.state == "applied" %}
+      <span class="badge badge-success">applied</span>
+    {% else %}
+      <span class="badge badge-ghost">unscored</span>
+    {% endif %}
+    {% if item.blacklisted %}
+      <span class="badge badge-error badge-outline">blacklisted</span>
+    {% endif %}
+    {% if item.warning_count %}
+      <span class="badge badge-warning badge-outline">
+        {{ item.warning_count }} warning{{ "s" if item.warning_count != 1 }}
+      </span>
+    {% endif %}
+  </td>
+  <td>
+    {% if item.application_status is not none %}
+      {{ item.application_status.value }}
+    {% endif %}
+  </td>
+  <td>
+    {% if item.run_id is not none %}
+      <button
+        type="button"
+        class="btn btn-ghost btn-xs"
+        hx-get="/review/partials/jobs/{{ item.job_id }}/detail"
+        hx-target="#review-detail-{{ item.job_id }}"
+        hx-swap="outerHTML"
+      >
+        Evidence
+      </button>
+    {% endif %}
+  </td>
+  <td>
+    {%
+      if
+      item.run_status == "scored"
+      and item.application_id is none
+      and not item.blacklisted
+    %}
+      <button
+        type="button"
+        class="btn btn-primary btn-xs"
+        hx-post="/jobs/{{ item.job_id }}/application"
+        hx-target="closest tr"
+        hx-swap="outerHTML"
+      >
+        Start draft
+      </button>
+    {% endif %}
+    {% if review_row_error %}
+      <p class="text-error mt-1 text-xs">{{ review_row_error }}</p>
+    {% endif %}
+  </td>
+</tr>
+<!-- The detail placeholder lives in _review_table.html, outside this
+     fragment, so a draft-action row swap cannot duplicate it. -->

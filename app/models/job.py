@@ -35,9 +35,13 @@ class JobListItem(SQLModel):
     """Display shape for one job card in the HTMX template."""
 
     id: int
+    company_id: int
     title: str
     company: str
     location: str
     source: str
     score: int | None
     url: str | None
+    blacklisted: bool = False
+    blacklist_kind: str | None = None  # "job" or "company" when blacklisted
+    blacklist_reason: str | None = None

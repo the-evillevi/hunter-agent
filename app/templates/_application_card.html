@@ -12,6 +12,16 @@
       <span class="badge badge-info badge-outline mt-3">
         {{ application.status }}
       </span>
+      {% if application.blacklisted %}
+        <span
+          class="badge badge-error badge-outline mt-3"
+          {% if application.blacklist_reason %}
+            title="{{ application.blacklist_reason }}"
+          {% endif %}
+        >
+          Blacklisted ({{ application.blacklist_kind }})
+        </span>
+      {% endif %}
     </div>
 
     <div class="text-base-content/70 text-sm lg:text-right">
@@ -71,10 +81,24 @@
       {% endfor %}
     </form>
 
-    {% if application.notes is not none %}
-      <p class="text-base-content/70 text-sm lg:col-span-2">
-        {{ application.notes }}
-      </p>
-    {% endif %}
+    <form
+      class="flex flex-col gap-2 lg:col-span-2"
+      hx-patch="/applications/{{ application.id }}/notes"
+      hx-target="closest article"
+      hx-swap="outerHTML"
+    >
+      <textarea
+        class="textarea textarea-bordered text-sm"
+        name="notes"
+        rows="2"
+        placeholder="Notes"
+      >
+{{ application.notes or "" }}</textarea
+      >
+      <!-- Explicit save only (decided on HNTR-52): no autosave machinery. -->
+      <button type="submit" class="btn btn-ghost btn-sm self-start">
+        Save notes
+      </button>
+    </form>
   </div>
 </article>

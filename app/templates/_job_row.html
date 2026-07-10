@@ -1,0 +1,110 @@
+<!-- One job row; blacklist mutations re-render just this fragment. -->
+<tr id="job-row-{{ job.id }}">
+  <td class="font-semibold">{{ job.title }}</td>
+  <td>{{ job.company }}</td>
+  <td>{{ job.location }}</td>
+  <td>{{ job.source }}</td>
+  <td>
+    {% if job.score is not none %}
+      <span class="badge badge-outline">{{ job.score }}/100</span>
+    {% endif %}
+  </td>
+  <td>
+    {% if job.blacklisted %}
+      <span
+        class="badge badge-error badge-outline"
+        {% if job.blacklist_reason %}title="{{ job.blacklist_reason }}"{% endif %}
+      >
+        Blacklisted ({{ job.blacklist_kind }})
+      </span>
+      {% if job.blacklist_kind == "job" %}
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          hx-delete="/jobs/{{ job.id }}/blacklist"
+          hx-target="closest tr"
+          hx-swap="outerHTML"
+        >
+          Remove
+        </button>
+      {% else %}
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          hx-delete="/companies/{{ job.company_id }}/blacklist"
+          hx-target="#jobs-list"
+          hx-swap="innerHTML"
+        >
+          Remove
+        </button>
+      {% endif %}
+    {% else %}
+      <div class="flex items-center gap-1">
+        <input
+          id="blacklist-reason-{{ job.id }}"
+          name="reason"
+          placeholder="Reason"
+          class="input input-bordered input-xs w-24"
+        />
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          hx-post="/jobs/{{ job.id }}/blacklist"
+          hx-include="#blacklist-reason-{{ job.id }}"
+          hx-target="closest tr"
+          hx-swap="outerHTML"
+        >
+          Job
+        </button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-xs"
+          hx-post="/companies/{{ job.company_id }}/blacklist"
+          hx-include="#blacklist-reason-{{ job.id }}"
+          hx-target="#jobs-list"
+          hx-swap="innerHTML"
+        >
+          Company
+        </button>
+      </div>
+    {% endif %}
+    {% if blacklist_row_error %}
+      <p class="text-error mt-1 text-xs">{{ blacklist_row_error }}</p>
+    {% endif %}
+  </td>
+  <td>
+    {% if base_resumes %}
+      <form
+        class="flex items-center gap-1"
+        hx-post="/jobs/{{ job.id }}/tailor"
+        hx-target="#tailor-result-{{ job.id }}"
+        hx-swap="innerHTML"
+      >
+        <select
+          class="select select-bordered select-sm"
+          name="resume_id"
+          required
+        >
+          {% for resume in base_resumes %}
+            <option value="{{ resume.id }}">{{ resume.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Tailor</button>
+      </form>
+      <div id="tailor-result-{{ job.id }}"></div>
+    {% else %}
+      <a class="link text-sm" href="/resumes">Add a resume first</a>
+    {% endif %}
+  </td>
+  <td>
+    {% if job.url %}
+      <a
+        class="btn btn-ghost btn-sm"
+        href="{{ job.url }}"
+        target="_blank"
+        rel="noreferrer"
+        >Open</a
+      >
+    {% endif %}
+  </td>
+</tr>
