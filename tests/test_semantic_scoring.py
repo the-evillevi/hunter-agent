@@ -7,11 +7,15 @@ Ollama server, model downloads, or network access.
 
 import asyncio
 from collections.abc import Callable
+import json
 
+import httpx
 import pytest
 
-from app.models.config import ProfileConfig
-from app.services.ai.errors import AIConnectError
+from app.models.scoring import SemanticScoreResult
+from app.services.ai.embeddings import OllamaEmbeddingsClient
+from app.services.ai.errors import AIConnectError, AIHTTPError, AIResponseError
+from app.services.profiles import ProfileDetail
 from app.services.scoring_pipeline import (
     KeywordScoreLayer,
     ScoreJobInput,
@@ -19,9 +23,9 @@ from app.services.scoring_pipeline import (
     ScoreLayerUnavailableError,
     score_job,
 )
-from app.models.scoring import SemanticScoreResult
 from app.services.semantic_scoring import (
     MAX_JOB_CHARS,
+    MAX_PROFILE_CHARS,
     SemanticScoreLayer,
     build_job_text,
     build_profile_text,
@@ -30,7 +34,7 @@ from app.services.semantic_scoring import (
 )
 
 
-MakeProfile = Callable[..., ProfileConfig]
+MakeProfile = Callable[..., ProfileDetail]
 
 
 class FakeEmbeddingsClient:
@@ -57,10 +61,10 @@ class FakeEmbeddingsClient:
 
 
 def make_layer(client: FakeEmbeddingsClient) -> SemanticScoreLayer:
-    return SemanticScoreLayer(client)  # type: ignore[arg-type]
+    return SemanticScoreLayer(client)
 
 
-def run_score(layer: SemanticScoreLayer, profile: ProfileConfig):
+def run_score(layer: SemanticScoreLayer, profile: ProfileDetail):
     job = ScoreJobInput(title="Python Developer", description="Build APIs.")
     return asyncio.run(layer.score(job, profile))
 
@@ -115,6 +119,7 @@ def test_job_and_profile_texts_are_bounded_before_embedding(
 
     embedded_texts = [text for call in client.calls for text in call]
     assert all(len(text) <= MAX_JOB_CHARS for text in embedded_texts)
+    assert len(build_profile_text(make_profile())) <= MAX_PROFILE_CHARS
 
 
 def test_profile_embedding_is_cached_across_jobs(make_profile: MakeProfile) -> None:
@@ -236,3 +241,83 @@ def test_job_text_joins_title_and_description() -> None:
     assert build_job_text(None, "Build APIs.") == "Build APIs."
     assert build_job_text("Dev", None) == "Dev"
     assert build_job_text(None, None) == ""
+    assert build_job_text("  ", "\n\t") == ""
+
+
+def test_ollama_embeddings_client_uses_mocked_transport() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["body"] = request.read().decode()
+        return httpx.Response(200, json={"embeddings": [[1, 0.5]]})
+
+    client = OllamaEmbeddingsClient(
+        "http://localhost:11434/",
+        transport=httpx.MockTransport(handler),
+    )
+
+    result = asyncio.run(client.embed(["Python engineer"]))
+
+    assert result == [(1.0, 0.5)]
+    assert captured["url"] == "http://localhost:11434/api/embed"
+    assert "Python engineer" in str(captured["body"])
+
+
+@pytest.mark.parametrize(
+    "vector",
+    [[True, 1], ["1", 2], [float("inf"), 1]],
+)
+def test_malformed_embedding_values_map_to_typed_error(vector: list[object]) -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            content=json.dumps({"embeddings": [vector]}),
+            headers={"content-type": "application/json"},
+        )
+    )
+    client = OllamaEmbeddingsClient("http://localhost", transport=transport)
+
+    with pytest.raises(AIResponseError):
+        asyncio.run(client.embed(["text"]))
+
+
+def test_inconsistent_batch_dimensions_map_to_typed_error() -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(
+            200,
+            json={"embeddings": [[1, 0], [1, 0, 0]]},
+        )
+    )
+    client = OllamaEmbeddingsClient("http://localhost", transport=transport)
+
+    with pytest.raises(AIResponseError, match="dimensions"):
+        asyncio.run(client.embed(["one", "two"]))
+
+
+def test_embedding_redirect_maps_to_typed_http_error() -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(307, headers={"location": "/other"})
+    )
+    client = OllamaEmbeddingsClient("http://localhost", transport=transport)
+
+    with pytest.raises(AIHTTPError) as excinfo:
+        asyncio.run(client.embed(["text"]))
+
+    assert excinfo.value.status_code == 307
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"base_url": " "}, "base URL"),
+        ({"base_url": "http://localhost", "model": " "}, "model"),
+        ({"base_url": "http://localhost", "timeout_seconds": 0}, "timeout"),
+    ],
+)
+def test_invalid_embedding_client_settings_are_rejected(
+    kwargs: dict[str, object],
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        OllamaEmbeddingsClient(**kwargs)  # type: ignore[arg-type]

@@ -12,12 +12,15 @@ deterministic score.
 
 import hashlib
 import math
+from typing import Protocol
 
-from app.models.config import ProfileConfig
 from app.models.scoring import SemanticScoreResult
-from app.services.ai.embeddings import OllamaEmbeddingsClient
 from app.services.ai.errors import AIProviderError
-from app.services.scoring_pipeline import ScoreJobInput, ScoreLayerUnavailableError
+from app.services.scoring_pipeline import (
+    ScoreJobInput,
+    ScoreLayerUnavailableError,
+    ScoringProfile,
+)
 
 
 SEMANTIC_LAYER_NAME = "semantic"
@@ -33,17 +36,21 @@ MAX_PROFILE_CHARS = 1000
 
 def build_job_text(title: str | None, description: str | None) -> str:
     """One bounded text representing the job for embedding."""
-    combined = " ".join(part for part in (title, description) if part)
+    parts = []
+    for part in (title, description):
+        if part and (normalized := part.strip()):
+            parts.append(normalized)
+    combined = " ".join(parts)
     return combined[:MAX_JOB_CHARS]
 
 
-def build_profile_text(profile: ProfileConfig) -> str:
+def build_profile_text(profile: ScoringProfile) -> str:
     """One bounded text representing the target profile for embedding.
 
     Keywords carry most of the signal today; the role name anchors them.
     A richer structured representation stays an open follow-up question.
     """
-    combined = f"{profile.role_name}: {', '.join(profile.keywords)}"
+    combined = f"{profile.profile.role_name}: {', '.join(profile.keywords)}"
     return combined[:MAX_PROFILE_CHARS]
 
 
@@ -59,7 +66,7 @@ def cosine_similarity(a: tuple[float, ...], b: tuple[float, ...]) -> float:
     # into score math, where comparisons silently misbehave.
     if not math.isfinite(similarity):
         return 0.0
-    return similarity
+    return min(1.0, max(-1.0, similarity))
 
 
 def similarity_to_score(similarity: float) -> int:
@@ -69,6 +76,14 @@ def similarity_to_score(similarity: float) -> int:
     both mean "not a match" for ranking purposes.
     """
     return round(100 * min(1.0, max(0.0, similarity)))
+
+
+class EmbeddingsClient(Protocol):
+    """Minimal embedding dependency required by the semantic layer."""
+
+    model: str
+
+    async def embed(self, texts: list[str]) -> list[tuple[float, ...]]: ...
 
 
 class SemanticScoreLayer:
@@ -84,7 +99,7 @@ class SemanticScoreLayer:
 
     def __init__(
         self,
-        embeddings: OllamaEmbeddingsClient,
+        embeddings: EmbeddingsClient,
         *,
         cache: dict[str, tuple[float, ...]] | None = None,
     ) -> None:
@@ -94,7 +109,7 @@ class SemanticScoreLayer:
     async def score(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> SemanticScoreResult:
         """Embed job and profile texts and score their similarity."""
         job_text = build_job_text(job.title, job.description)
@@ -134,7 +149,7 @@ class SemanticScoreLayer:
             score=score,
             explanation=(
                 f"Embedding similarity {similarity:.3f} against profile "
-                f"{profile.role_name!r} using {self._embeddings.model}"
+                f"{profile.profile.role_name!r} using {self._embeddings.model}"
             ),
             model=self._embeddings.model,
             similarity=similarity,

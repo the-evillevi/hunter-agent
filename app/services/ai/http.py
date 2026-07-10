@@ -47,7 +47,7 @@ async def post_json(
             model=model,
         ) from error
 
-    if response.status_code >= 400:
+    if not response.is_success:
         raise AIHTTPError(
             f"{provider} returned HTTP {response.status_code}",
             provider=provider,

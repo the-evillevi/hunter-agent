@@ -9,6 +9,7 @@ injectable-transport testing pattern with the completion adapter.
 """
 
 import json
+import math
 
 import httpx
 
@@ -40,8 +41,14 @@ class OllamaEmbeddingsClient:
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        self.model = model
-        self._base_url = base_url.rstrip("/")
+        self.model = model.strip()
+        self._base_url = base_url.strip().rstrip("/")
+        if not self.model:
+            raise ValueError("embedding model must not be blank")
+        if not self._base_url:
+            raise ValueError("embedding base URL must not be blank")
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise ValueError("embedding timeout must be finite and positive")
         self._timeout_seconds = timeout_seconds
         self._transport = transport
 
@@ -89,12 +96,23 @@ class OllamaEmbeddingsClient:
                     provider=self.provider_name,
                     model=self.model,
                 )
-            try:
-                vectors.append(tuple(float(value) for value in vector))
-            except (TypeError, ValueError) as error:
+            if any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                for value in vector
+            ):
                 raise AIResponseError(
-                    "Ollama embeddings returned non-numeric vector values",
+                    "Ollama embeddings returned non-finite or non-numeric values",
                     provider=self.provider_name,
                     model=self.model,
-                ) from error
+                )
+            vectors.append(tuple(float(value) for value in vector))
+
+        if vectors and any(len(vector) != len(vectors[0]) for vector in vectors[1:]):
+            raise AIResponseError(
+                "Ollama embeddings returned inconsistent vector dimensions",
+                provider=self.provider_name,
+                model=self.model,
+            )
         return vectors

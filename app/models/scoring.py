@@ -49,8 +49,8 @@ class KeywordScoreResult(ScoreLayerResult):
 class SemanticScoreResult(ScoreLayerResult):
     """Semantic-layer result keeping model identity and the raw similarity."""
 
-    model: str
-    similarity: float
+    model: str = Field(min_length=1)
+    similarity: float = Field(ge=-1, le=1, allow_inf_nan=False)
 
 
 class LayerOutcome(BaseModel):
