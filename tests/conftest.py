@@ -21,13 +21,48 @@ from app.models.application import Application, ApplicationStatus
 from app.models.company import Company
 from app.models.job import Job
 from app.models.location import Location
-from app.models.profile import Profile
+from app.models.profile import LocationType, Profile
 from app.models.source import Source
+from app.services.profiles import ProfileDetail
 
 # Imported for their side effect: registering the resume tables on
 # SQLModel.metadata so every test database includes them, even when the
 # resume test modules are not part of the collected test run.
 from app.models import resume as _resume_models  # noqa: F401
+
+
+@pytest.fixture()
+def make_profile() -> Callable[..., ProfileDetail]:
+    """Build a minimal persisted-profile view for scoring and eligibility tests.
+
+    Shared here so every scoring-related test module constructs profiles the
+    same way and only overrides the fields it cares about.
+    """
+
+    def _make_profile(
+        *,
+        keywords: list[str] | None = None,
+        exclude_keywords: list[str] | None = None,
+        salary_min: int = 0,
+        location_type: str | list[str] = "remote",
+    ) -> ProfileDetail:
+        location_types = (
+            [location_type] if isinstance(location_type, str) else location_type
+        )
+        return ProfileDetail(
+            profile=Profile(
+                role_name="Test Role",
+                active=True,
+                match_threshold=80,
+                salary_min=salary_min,
+            ),
+            location_types=tuple(LocationType(value) for value in location_types),
+            keywords=tuple(keywords or ["Python"]),
+            exclude_keywords=tuple(exclude_keywords or []),
+            source_queries=(),
+        )
+
+    return _make_profile
 
 
 @pytest.fixture()
