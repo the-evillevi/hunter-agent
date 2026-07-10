@@ -1,0 +1,248 @@
+{
+  "name": "master",
+  "basics": {
+    "name": "Leví Carbellido",
+    "label": "Senior Full Stack Engineer · Machine Learning Engineer",
+    "email": "levi.carbellido@outlook.com",
+    "phone": "(+52) 55-7207-9327",
+    "profiles": [
+      {
+        "network": "GitHub",
+        "username": "the-evillevi",
+        "url": "https://github.com/the-evillevi"
+      },
+      {
+        "network": "LinkedIn",
+        "username": "levicarbellido",
+        "url": "https://www.linkedin.com/in/levicarbellido"
+      }
+    ],
+    "availability": {
+      "languages": "Advanced English fluency",
+      "relocation": true,
+      "full_time": true,
+      "flexible_schedule": true
+    }
+  },
+  "sections": [
+    {
+      "type": "summary",
+      "title": "Professional Summary",
+      "items": [
+        {
+          "text": "Software Engineer with 5+ years of experience building scalable full-stack and cloud-native applications. Proven track record delivering robust solutions across the complete development lifecycle — from architecture and development to CI/CD, deployment, and monitoring. Experienced in Agile teams at global enterprises (IBM, Oracle) and comfortable leading initiatives in fast-paced, collaborative environments. Holds a Google Cloud Professional Machine Learning Engineer certification.",
+          "source": "v11"
+        },
+        {
+          "text": "Software Developer with Machine Learning Engineering experience. Experienced in leading and motivating small teams to achieve success in challenging situations. Innovative and scientifically rigorous engineer with machine learning engineering experience to bring to the table.",
+          "source": "v10"
+        }
+      ]
+    },
+    {
+      "type": "experience",
+      "title": "Work Experience",
+      "items": [
+        {
+          "position": "Application Developer",
+          "company": "IBM",
+          "start_date": "2023-10",
+          "end_date": null,
+          "location": "Remote",
+          "highlights": [
+            "Designed and implemented automated ETL workflows, reducing manual intervention and processing time.",
+            "Built BigQuery automations to streamline data ingestion and transformation, cutting query costs and accelerating data processing pipelines.",
+            "Improved data pipeline reliability by enhancing monitoring and failure-detection mechanisms.",
+            "Established CI/CD pipelines for data workflows via GitHub Actions, enabling automated testing and continuous deployment.",
+            "Containerized and deployed analytics applications using Docker and Kubernetes (GKE) for scalable, resilient production environments.",
+            "Developed performant web applications with Next.js and TypeScript, improving reliability, maintainability, and user experience.",
+            "Developed and maintained monolithic backend services using Java and Spring Boot, contributing to scalable enterprise application architecture.",
+            "Delivered work within Agile/Scrum ceremonies (sprint planning, standups, retrospectives) in a cross-functional remote team."
+          ],
+          "source": "v10+v11"
+        },
+        {
+          "position": "Software Developer",
+          "company": "Oracle",
+          "start_date": "2021-05",
+          "end_date": "2022-04",
+          "location": "Remote",
+          "highlights": [
+            "Provided technical support and feature development for a React/TypeScript/Node.js application, resolving issues and improving system performance.",
+            "Implemented automated testing with Jenkins, ensuring consistent application behavior across releases.",
+            "Applied CI/CD best practices to optimize development workflows and reduce time-to-market for new features.",
+            "Participated in daily Agile/Scrum rituals (standups, sprint reviews, retrospectives) within a distributed engineering team."
+          ],
+          "source": "v10+v11"
+        },
+        {
+          "position": "Full Stack Developer",
+          "company": "Cajanauta.com",
+          "start_date": "2020-08",
+          "end_date": "2021-05",
+          "location": "Remote",
+          "highlights": [
+            "Built a React-based web application enabling marketplace owners to automate common e-commerce tasks.",
+            "Architected the backend on AWS using Amplify, Cognito, API Gateway, DynamoDB, and Lambda.",
+            "Reduced deployment setup time by over 50% through infrastructure-as-code practices and automated AWS configuration."
+          ],
+          "source": "v10+v11"
+        },
+        {
+          "position": "Machine Learning Engineer",
+          "company": "Monterrey Institute of Technology and Higher Education",
+          "start_date": "2018-08",
+          "end_date": "2020-06",
+          "location": "Xochitepec, Morelos",
+          "highlights": [
+            "Designed and evaluated six ML models (including J48, SVM, Random Forest, MLP) for network intrusion detection using the CIC DoS dataset.",
+            "Achieved a 95% detection rate for DoS attacks through hyperparameter optimization and iterative model tuning.",
+            "Co-authored a published research paper on the SDN-based architecture (available on ResearchGate)."
+          ],
+          "source": "v10+v11"
+        }
+      ]
+    },
+    {
+      "type": "skills",
+      "title": "Technical Skills",
+      "items": [
+        {
+          "category": "Languages",
+          "keywords": ["Python", "JavaScript", "TypeScript", "Java", "SQL"],
+          "detail": "Python, JavaScript, TypeScript (5 yrs); Java, SQL (3 yrs)",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Frontend",
+          "keywords": [
+            "React",
+            "Next.js",
+            "React Native",
+            "Svelte",
+            "Angular",
+            "HTML/CSS"
+          ],
+          "detail": "React (3 yrs); Next.js, React Native, Svelte, Angular (1 yr or less); HTML/CSS",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Backend",
+          "keywords": [
+            "Node.js",
+            "REST APIs",
+            "AWS Lambda",
+            "API Gateway",
+            "Spring Boot"
+          ],
+          "detail": "Node.js (3 yrs); REST APIs; AWS Lambda, API Gateway; Java/Spring Boot at IBM",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Cloud & Infra",
+          "keywords": [
+            "GCP",
+            "GKE",
+            "BigQuery",
+            "Cloud SQL",
+            "Cloud Storage",
+            "Vertex AI",
+            "AWS",
+            "Docker",
+            "Kubernetes"
+          ],
+          "detail": "GCP: GKE, Cloud SQL, Cloud Storage, BigQuery (2 yrs), Vertex AI (1 yr or less); AWS: Amplify, Cognito, API Gateway, DynamoDB, Lambda (project & self-study exposure); Docker; Kubernetes",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Data & ML",
+          "keywords": [
+            "Vertex AI",
+            "scikit-learn",
+            "NumPy",
+            "Pandas",
+            "Plotly",
+            "Apache Spark",
+            "Hadoop"
+          ],
+          "detail": "Vertex AI, scikit-learn, NumPy, Pandas, Plotly (1 yr or less); Apache Spark, Hadoop (familiar)",
+          "source": "v10+v11"
+        },
+        {
+          "category": "DevOps",
+          "keywords": [
+            "CI/CD",
+            "GitHub Actions",
+            "Jenkins",
+            "Git",
+            "GitHub",
+            "automated testing"
+          ],
+          "detail": "CI/CD: GitHub Actions (2 yrs), Jenkins; version control with Git/GitHub (5 yrs); automated testing",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Databases",
+          "keywords": [
+            "MySQL",
+            "BigQuery",
+            "DynamoDB",
+            "Cloud SQL",
+            "PL/SQL",
+            "MS SQL"
+          ],
+          "detail": "MySQL (5 yrs), BigQuery, DynamoDB, Cloud SQL; PL/SQL, MS SQL, Tableau, Scala, PHP (familiar)",
+          "source": "v10+v11"
+        },
+        {
+          "category": "Practices",
+          "keywords": [
+            "Agile",
+            "Scrum",
+            "code review",
+            "cross-functional collaboration",
+            "technical mentoring",
+            "team leadership"
+          ],
+          "detail": "Agile/Scrum (3+ yrs, IBM & Oracle); code review; cross-functional collaboration; technical mentoring; leading and motivating small teams",
+          "source": "v10+v11"
+        }
+      ]
+    },
+    {
+      "type": "projects",
+      "title": "Projects & Publications",
+      "items": [
+        {
+          "name": "A Flexible SDN-based Architecture for Identifying and Mitigating Low-Rate DDoS Attacks using Machine Learning",
+          "kind": "publication",
+          "publisher": "ResearchGate",
+          "description": "Worked on an SDN-based system for detecting low-rate DDoS attacks using ML models (J48, RF, MLP, SVM). Built Java/Python prototypes and achieved a 95% detection rate on the CIC DoS dataset.",
+          "source": "v10+v11"
+        }
+      ]
+    },
+    {
+      "type": "education",
+      "title": "Education",
+      "items": [
+        {
+          "degree": "Bachelor's Degree in Computer Technology Engineering (Computer Systems Engineering)",
+          "institution": "Tecnológico de Monterrey",
+          "source": "v11"
+        }
+      ]
+    },
+    {
+      "type": "certifications",
+      "title": "Certifications",
+      "items": [
+        {
+          "name": "Google Cloud Professional Machine Learning Engineer",
+          "issuer": "Google Cloud",
+          "source": "v10+v11"
+        }
+      ]
+    }
+  ]
+}
