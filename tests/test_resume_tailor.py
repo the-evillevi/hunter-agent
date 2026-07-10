@@ -10,7 +10,7 @@ import pytest
 from sqlmodel import Session, select
 
 from app.models.config import OllamaConfig
-from app.models.resume import ResumeTailorRun, SectionType
+from app.models.resume import ResumeTailorRun, ResumeTailorRunItem, SectionType
 from app.services.ollama_client import (
     FALLBACK_SCORE,
     OllamaClient,
@@ -139,6 +139,36 @@ def test_tailor_records_audit_run(
     assert runs[0].job_id == job.id
     assert runs[0].model == "fake-model"
     assert runs[0].prompt_version == "test"
+    assert runs[0].duration_ms >= 0
+
+
+def test_tailor_records_dropped_items_in_run_audit(
+    session: Session, create_job, base_resume_id: int
+) -> None:
+    """Filtered-out items keep their scores in the audit for analytics."""
+    job = create_job(title="Data Engineer")
+    tailor = ResumeTailor(client=FakeScoringClient())
+
+    tailor.tailor_to_job(session, base_resume_id=base_resume_id, job_id=job.id)
+
+    run = session.exec(select(ResumeTailorRun)).one()
+    audit_items = session.exec(
+        select(ResumeTailorRunItem).where(ResumeTailorRunItem.run_id == run.id)
+    ).all()
+
+    # Every scorable item in the fixture is audited, kept or not; basics
+    # is copied verbatim and never audited.
+    assert audit_items
+    assert all(item.section_type != SectionType.basics for item in audit_items)
+
+    dropped = [item for item in audit_items if not item.kept]
+    assert dropped
+    assert all(item.score == 20 for item in dropped)
+    assert all(item.reasoning == "Unrelated to this job." for item in dropped)
+
+    kept = [item for item in audit_items if item.kept]
+    assert kept
+    assert all("IBM" in item.item_content for item in kept)
 
 
 def test_tailor_leaves_base_resume_untouched(

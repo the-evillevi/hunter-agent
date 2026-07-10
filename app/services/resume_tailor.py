@@ -8,6 +8,7 @@ resume_tailor_runs so scores stay attributable to a model and prompt version.
 """
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -19,6 +20,7 @@ from app.models.resume import (
     ResumeProfile,
     ResumeSectionDetail,
     ResumeTailorRun,
+    ResumeTailorRunItem,
     SectionType,
 )
 from app.services.ollama_client import OllamaClient, ScoringResult
@@ -70,7 +72,12 @@ class ResumeTailor:
         if job is None:
             raise LookupError(f"Job {job_id} was not found")
 
+        run_started = time.perf_counter()
         scored_sections = self._score_sections(base.sections, job)
+        selections = [
+            (section, scored_items, self._select_items(section, scored_items))
+            for section, scored_items in scored_sections
+        ]
 
         try:
             variant = create_resume_profile(
@@ -81,8 +88,7 @@ class ResumeTailor:
             )
 
             written_sections = 0
-            for section, scored_items in scored_sections:
-                kept_items = self._select_items(section, scored_items)
+            for section, _scored_items, kept_items in selections:
                 if not kept_items:
                     continue
 
@@ -105,15 +111,17 @@ class ResumeTailor:
                         score_is_fallback=result.is_fallback if result else False,
                     )
 
-            session.add(
-                ResumeTailorRun(
-                    source_profile_id=base_resume_id,
-                    output_profile_id=variant.id,
-                    job_id=job_id,
-                    model=self.client.model_name,
-                    prompt_version=self.client.prompt_version,
-                )
+            run = ResumeTailorRun(
+                source_profile_id=base_resume_id,
+                output_profile_id=variant.id,
+                job_id=job_id,
+                model=self.client.model_name,
+                prompt_version=self.client.prompt_version,
+                duration_ms=int((time.perf_counter() - run_started) * 1000),
             )
+            session.add(run)
+            session.flush()
+            self._record_run_items(session, run, selections)
             session.commit()
         except Exception:
             session.rollback()
@@ -121,6 +129,38 @@ class ResumeTailor:
 
         session.refresh(variant)
         return variant
+
+    def _record_run_items(
+        self,
+        session: Session,
+        run: ResumeTailorRun,
+        selections: list[
+            tuple[
+                ResumeSectionDetail,
+                list[tuple[ResumeItemDetail, ScoringResult | None]],
+                list[tuple[ResumeItemDetail, ScoringResult | None]],
+            ]
+        ],
+    ) -> None:
+        """Persist every scored item — dropped ones included — for analytics."""
+        for section, scored_items, kept_items in selections:
+            if section.section_type in UNSCORED_SECTION_TYPES:
+                continue
+            kept_item_ids = {item.id for item, _ in kept_items}
+            for item, result in scored_items:
+                if result is None:
+                    continue
+                session.add(
+                    ResumeTailorRunItem(
+                        run_id=run.id,
+                        section_type=section.section_type,
+                        item_content=json.dumps(item.content, ensure_ascii=False),
+                        score=result.score,
+                        reasoning=result.reasoning,
+                        is_fallback=result.is_fallback,
+                        kept=item.id in kept_item_ids,
+                    )
+                )
 
     def _score_sections(
         self,

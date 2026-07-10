@@ -264,6 +264,8 @@ CREATE TABLE resume_items (
 );
 
 -- Audit log: one row per tailoring run that produced a variant for a job.
+-- duration_ms records the wall-clock time of the whole run (scoring plus
+-- variant writes).
 CREATE TABLE resume_tailor_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id) ON DELETE CASCADE,
@@ -271,8 +273,30 @@ CREATE TABLE resume_tailor_runs (
   job_id INTEGER NOT NULL REFERENCES jobs (id),
   model TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Audit detail: one scored fact per run, whether kept or dropped. Items
+-- below the relevance threshold never reach the variant, so this table is
+-- the only place their scores and reasoning survive for analytics.
+-- item_content is a JSON snapshot because base items can be edited or
+-- deleted after the run.
+CREATE TABLE resume_tailor_run_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL REFERENCES resume_tailor_runs (id) ON DELETE CASCADE,
+  section_type TEXT NOT NULL,
+  item_content TEXT NOT NULL,
+  score REAL CHECK (
+    score IS NULL
+    OR score BETWEEN 0 AND 100
+  ),
+  reasoning TEXT,
+  is_fallback BOOLEAN NOT NULL DEFAULT 0 CHECK (is_fallback IN (0, 1)),
+  kept BOOLEAN NOT NULL CHECK (kept IN (0, 1))
+);
+
+CREATE INDEX idx_resume_tailor_run_items_run ON resume_tailor_run_items (run_id);
 
 -- Saved export configurations: which format and sections to compile.
 -- section_filters holds a JSON-encoded list of section type names, or
