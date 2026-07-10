@@ -202,10 +202,12 @@ def test_internal_partial_reads_are_excluded_from_openapi(client) -> None:
 
     assert "/companies" in paths
     assert "/jobs" in paths
+    assert "/profiles" in paths
     partial_paths = {
         "/companies/partials/table",
         "/jobs/partials/list",
         "/sources/partials/list",
         "/applications/partials/list",
+        "/profiles/partials/list",
     }
     assert partial_paths.isdisjoint(paths)

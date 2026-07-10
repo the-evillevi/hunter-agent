@@ -1,7 +1,15 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import applications, companies, dashboard, health, jobs, sources
+from app.routes import (
+    applications,
+    companies,
+    dashboard,
+    health,
+    jobs,
+    profiles,
+    sources,
+)
 
 app = FastAPI(title="hunter-agent")
 
@@ -13,5 +21,6 @@ app.include_router(health.router)
 app.include_router(dashboard.router)
 app.include_router(applications.router)
 app.include_router(jobs.router)
+app.include_router(profiles.router)
 app.include_router(sources.router)
 app.include_router(companies.router)

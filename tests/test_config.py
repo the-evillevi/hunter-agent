@@ -25,23 +25,8 @@ def test_load_config_returns_validated_model() -> None:
 
     assert isinstance(config, AppConfig)
     assert config.agent.name == "hunter-agent"
-    assert config.profiles[0].keywords
-
-
-def test_profile_match_threshold_must_be_in_range() -> None:
-    raw_config = deepcopy(load_raw_config())
-    raw_config["profiles"][0]["match_threshold"] = 101
-
-    with pytest.raises(ValidationError):
-        AppConfig.model_validate(raw_config)
-
-
-def test_profile_keywords_must_not_be_empty() -> None:
-    raw_config = deepcopy(load_raw_config())
-    raw_config["profiles"][0]["keywords"] = []
-
-    with pytest.raises(ValidationError):
-        AppConfig.model_validate(raw_config)
+    assert "profiles" not in load_raw_config()
+    assert not hasattr(config, "profiles")
 
 
 @pytest.mark.parametrize("runs_at", [[], ["8:00"], ["24:00"], ["12:60"]])
@@ -133,24 +118,6 @@ def test_ssga_source_treats_blank_local_path_as_remote_download() -> None:
     config = AppConfig.model_validate(raw_config)
 
     assert config.sources.ssga_spy_holdings.workbook_path is None
-
-
-@pytest.mark.parametrize("field", ["keywords", "exclude_keywords"])
-def test_profile_keywords_reject_case_insensitive_duplicates(field: str) -> None:
-    raw_config = deepcopy(load_raw_config())
-    raw_config["profiles"][0][field] = ["Python", " python "]
-
-    with pytest.raises(ValidationError):
-        AppConfig.model_validate(raw_config)
-
-
-def test_profile_keywords_are_stripped() -> None:
-    raw_config = deepcopy(load_raw_config())
-    raw_config["profiles"][0]["keywords"] = [" Python "]
-
-    config = AppConfig.model_validate(raw_config)
-
-    assert config.profiles[0].keywords == ["Python"]
 
 
 @pytest.mark.parametrize(
