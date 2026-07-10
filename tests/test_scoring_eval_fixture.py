@@ -7,10 +7,17 @@ Shape rules (ids, labels, notes, size floor) live in the Pydantic models
 in scoring_eval.py; these tests only add checks the schema cannot state.
 """
 
+from dataclasses import replace
+
 import pytest
 
 from app.services.eligibility import check_eligibility
-from scoring_eval import EvalFixture, load_fixture
+from scoring_eval import (
+    EvalFixture,
+    assert_deterministic_runs_equal,
+    deterministic_snapshots,
+    load_fixture,
+)
 
 
 def test_fixture_parses_and_validates() -> None:
@@ -67,3 +74,21 @@ def test_duplicate_ids_are_rejected() -> None:
 
     with pytest.raises(ValueError, match="unique"):
         EvalFixture.model_validate(payload)
+
+
+def test_deterministic_layers_match_across_fresh_runs() -> None:
+    fixture = load_fixture()
+
+    assert_deterministic_runs_equal(
+        deterministic_snapshots(fixture),
+        deterministic_snapshots(fixture),
+    )
+
+
+def test_deterministic_comparison_rejects_divergence() -> None:
+    first = deterministic_snapshots(load_fixture())
+    second = [*first]
+    second[0] = replace(second[0], keyword_json='{"score": -1}')
+
+    with pytest.raises(AssertionError, match=second[0].job_id):
+        assert_deterministic_runs_equal(first, second)

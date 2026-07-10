@@ -8,14 +8,25 @@ a human 0-2 relevance grade per job (HNTR-1).
 
 from __future__ import annotations
 
+import asyncio
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.profile import LocationType, Profile
+from app.services.eligibility import check_eligibility
+from app.services.keyword_scoring import score_job_keywords
 from app.services.profiles import ProfileDetail
+from app.services.scoring_pipeline import (
+    LAYER_WEIGHTS,
+    KeywordScoreLayer,
+    ScoreJobInput,
+    ScoreLayerRegistry,
+    score_job,
+)
 
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "scoring_eval.json"
@@ -101,3 +112,77 @@ class EvalFixture(BaseModel):
 def load_fixture() -> EvalFixture:
     """Parse and validate the labeled corpus from disk."""
     return EvalFixture.model_validate(json.loads(FIXTURE_PATH.read_text()))
+
+
+@dataclass(frozen=True)
+class DeterministicSnapshot:
+    """Stable eligibility, keyword, and composed-pipeline output for one job."""
+
+    job_id: str
+    eligibility_json: str
+    keyword_json: str
+    pipeline_json: str
+
+
+def deterministic_snapshots(fixture: EvalFixture) -> list[DeterministicSnapshot]:
+    """Evaluate every deterministic layer with a fresh registry."""
+    profile = fixture.profile.to_profile_detail()
+    registry = ScoreLayerRegistry()
+    registry.register(
+        KeywordScoreLayer(), weight=LAYER_WEIGHTS["keyword"], required=True
+    )
+    return [_deterministic_snapshot(job, profile, registry) for job in fixture.jobs]
+
+
+def assert_deterministic_runs_equal(
+    first: list[DeterministicSnapshot],
+    second: list[DeterministicSnapshot],
+) -> None:
+    """Fail with the changed fixture ids when deterministic output drifts."""
+    if first == second:
+        return
+    first_by_id = {snapshot.job_id: snapshot for snapshot in first}
+    second_by_id = {snapshot.job_id: snapshot for snapshot in second}
+    changed = sorted(
+        job_id
+        for job_id in first_by_id.keys() | second_by_id.keys()
+        if first_by_id.get(job_id) != second_by_id.get(job_id)
+    )
+    raise AssertionError(f"deterministic output changed for: {', '.join(changed)}")
+
+
+def _deterministic_snapshot(
+    job: EvalJob,
+    profile: ProfileDetail,
+    registry: ScoreLayerRegistry,
+) -> DeterministicSnapshot:
+    eligibility = check_eligibility(
+        title=job.title,
+        description=job.description,
+        location=job.location,
+        profile=profile,
+    )
+    keyword = score_job_keywords(job.title, job.description, profile)
+    result = asyncio.run(
+        score_job(
+            ScoreJobInput(
+                title=job.title,
+                description=job.description,
+                location=job.location,
+            ),
+            profile,
+            registry=registry,
+        )
+    )
+    pipeline_payload = result.model_dump(mode="json")
+    for outcome in pipeline_payload["layer_outcomes"]:
+        # Wall-clock timing is operational metadata, not scoring output.
+        outcome.pop("duration_ms", None)
+    return DeterministicSnapshot(
+        job_id=job.id,
+        eligibility_json=json.dumps(
+            eligibility.model_dump(mode="json"), sort_keys=True
+        ),
+        keyword_json=json.dumps(keyword.model_dump(mode="json"), sort_keys=True),
+        pipeline_json=json.dumps(pipeline_payload, sort_keys=True),
+    )

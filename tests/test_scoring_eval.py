@@ -35,7 +35,13 @@ from app.services.scoring_pipeline import (
     score_job,
 )
 from app.services.semantic_scoring import SemanticScoreLayer
-from scoring_eval import LABEL_CUTS, EvalJob, load_fixture
+from scoring_eval import (
+    LABEL_CUTS,
+    EvalJob,
+    assert_deterministic_runs_equal,
+    deterministic_snapshots,
+    load_fixture,
+)
 
 
 pytestmark = pytest.mark.skipif(
@@ -189,6 +195,13 @@ def test_layer_comparison_over_labeled_fixture() -> None:
 
     rows = [evaluate_job(job, profile, registry) for job in fixture.jobs]
     print_table(rows, models_available=base_url is not None)
+
+    # Each call constructs a fresh registry. Compare every deterministic
+    # eligibility, keyword, and composed-pipeline field except wall time.
+    assert_deterministic_runs_equal(
+        deterministic_snapshots(fixture),
+        deterministic_snapshots(fixture),
+    )
 
     # Falsifiable checks: the pipeline's keyword layer must agree with
     # the directly-called scorer (this is the drift the harness can
