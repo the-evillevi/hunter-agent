@@ -11,7 +11,6 @@ from collections.abc import Callable
 
 import pytest
 
-from app.models.config import ProfileConfig
 from app.models.scoring import LlmScoreResult
 from app.services.ai.completion import CompletionRequest, CompletionResponse
 from app.services.ai.errors import AIConnectError
@@ -21,8 +20,11 @@ from app.services.llm_scoring import (
     LlmScoreLayer,
     LlmScorePayload,
     MAX_ATTEMPTS,
+    MAX_PROFILE_SUMMARY_CHARS,
     ScoreLayerUnavailableError,
+    build_profile_summary,
 )
+from app.services.profiles import ProfileDetail
 from app.services.scoring_pipeline import (
     KeywordScoreLayer,
     ScoreJobInput,
@@ -31,7 +33,7 @@ from app.services.scoring_pipeline import (
 )
 
 
-MakeProfile = Callable[..., ProfileConfig]
+MakeProfile = Callable[..., ProfileDetail]
 
 VALID_REPLY = json.dumps({"score": 85, "reasoning": "Strong Python overlap."})
 
@@ -68,7 +70,7 @@ def python_job() -> ScoreJobInput:
     )
 
 
-def run_layer(provider: FakeCompletionProvider, profile: ProfileConfig):
+def run_layer(provider: FakeCompletionProvider, profile: ProfileDetail):
     return asyncio.run(LlmScoreLayer(provider).score(python_job(), profile))
 
 
@@ -121,13 +123,42 @@ def test_oversized_job_text_is_bounded_by_the_guard(
     assert len(provider.requests[0].prompt) < 10_000
 
 
+def test_profile_summary_is_bounded(make_profile: MakeProfile) -> None:
+    profile = make_profile(keywords=["x" * 5000])
+
+    assert len(build_profile_summary(profile)) == MAX_PROFILE_SUMMARY_CHARS
+
+
 def test_malformed_then_valid_reply_retries_once(make_profile: MakeProfile) -> None:
     provider = FakeCompletionProvider(["not json at all", VALID_REPLY])
 
     result = run_layer(provider, make_profile())
 
     assert result.attempts == 2
-    assert "not valid against the required schema" in provider.requests[1].prompt
+    assert result.duration_ms == 10
+    assert "not valid against the required schema" in (
+        provider.requests[1].system_prompt or ""
+    )
+    assert provider.requests[1].prompt == provider.requests[0].prompt
+
+
+@pytest.mark.parametrize(
+    "invalid_reply",
+    [
+        json.dumps({"score": True, "reasoning": "not an integer"}),
+        json.dumps({"score": 80, "reasoning": "   "}),
+        json.dumps({"score": 80, "reasoning": "ok", "extra": "forbidden"}),
+    ],
+)
+def test_schema_rejects_coercions_blank_reasoning_and_extra_fields(
+    invalid_reply: str,
+    make_profile: MakeProfile,
+) -> None:
+    provider = FakeCompletionProvider([invalid_reply, VALID_REPLY])
+
+    result = run_layer(provider, make_profile())
+
+    assert result.attempts == 2
 
 
 def test_out_of_range_score_is_rejected_then_retried(
@@ -153,6 +184,8 @@ def test_two_invalid_replies_fail_explicitly_with_diagnostics(
     assert excinfo.value.model == "fake-model"
     assert excinfo.value.prompt_version == LLM_PROMPT_VERSION
     assert excinfo.value.attempts == MAX_ATTEMPTS
+    assert "model=fake-model" in str(excinfo.value)
+    assert f"prompt_version={LLM_PROMPT_VERSION}" in str(excinfo.value)
 
 
 def test_provider_failure_degrades_without_retry(make_profile: MakeProfile) -> None:
@@ -193,6 +226,22 @@ def test_job_without_text_skips_the_llm_layer(make_profile: MakeProfile) -> None
     assert provider.requests == []
 
 
+def test_whitespace_only_job_skips_without_model_call(
+    make_profile: MakeProfile,
+) -> None:
+    provider = FakeCompletionProvider([VALID_REPLY])
+
+    with pytest.raises(ScoreLayerUnavailableError):
+        asyncio.run(
+            LlmScoreLayer(provider).score(
+                ScoreJobInput(title="  ", description="\n\t"),
+                make_profile(),
+            )
+        )
+
+    assert provider.requests == []
+
+
 def test_result_retains_model_call_duration(make_profile: MakeProfile) -> None:
     provider = FakeCompletionProvider([VALID_REPLY])
 
@@ -216,3 +265,5 @@ def test_pipeline_records_failure_and_keeps_deterministic_score(
     llm_outcome = result.layer_outcomes[1]
     assert llm_outcome.status == "failure"
     assert "no valid score" in (llm_outcome.failure_detail or "")
+    assert "model=fake-model" in (llm_outcome.failure_detail or "")
+    assert f"prompt_version={LLM_PROMPT_VERSION}" in (llm_outcome.failure_detail or "")

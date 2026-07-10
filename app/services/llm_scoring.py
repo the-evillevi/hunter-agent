@@ -11,9 +11,8 @@ a pipeline skip and validation failures to an explicit layer failure,
 neither of which touches deterministic scoring.
 """
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from app.models.config import ProfileConfig
 from app.models.scoring import LlmScoreResult
 from app.services.ai.completion import CompletionProvider, CompletionRequest
 from app.services.ai.errors import AIProviderError
@@ -22,7 +21,11 @@ from app.services.prompt_guard import (
     build_guarded_payload,
     guard_untrusted_text,
 )
-from app.services.scoring_pipeline import ScoreJobInput, ScoreLayerUnavailableError
+from app.services.scoring_pipeline import (
+    ScoreJobInput,
+    ScoreLayerUnavailableError,
+    ScoringProfile,
+)
 
 
 LLM_LAYER_NAME = "llm"
@@ -35,6 +38,8 @@ LLM_PROMPT_VERSION = "1"
 # One repair retry, then explicit failure: a local model that cannot
 # produce valid JSON twice will not get better on a third identical ask.
 MAX_ATTEMPTS = 2
+MAX_PROFILE_SUMMARY_CHARS = 1000
+MAX_REASONING_CHARS = 1000
 
 SCORING_INSTRUCTIONS = (
     "You are scoring how well one job listing matches a target profile.\n"
@@ -54,8 +59,18 @@ REPAIR_NOTE = (
 class LlmScorePayload(BaseModel):
     """The exact shape the model must return; doubles as the JSON schema."""
 
-    score: int = Field(ge=0, le=100)
-    reasoning: str = Field(min_length=1)
+    model_config = ConfigDict(extra="forbid")
+
+    score: int = Field(ge=0, le=100, strict=True)
+    reasoning: str = Field(min_length=1, max_length=MAX_REASONING_CHARS)
+
+    @field_validator("reasoning")
+    @classmethod
+    def reasoning_must_not_be_blank(cls, reasoning: str) -> str:
+        reasoning = reasoning.strip()
+        if not reasoning:
+            raise ValueError("reasoning must not be blank")
+        return reasoning
 
 
 # The schema is static; computing it once keeps the retry loop free of
@@ -81,11 +96,17 @@ class LlmScoreFailedError(Exception):
         model: str,
         prompt_version: str,
         attempts: int,
+        guard_flag_codes: tuple[str, ...],
     ) -> None:
-        super().__init__(message)
+        flags = ",".join(guard_flag_codes) or "none"
+        super().__init__(
+            f"model={model}; prompt_version={prompt_version}; attempts={attempts}; "
+            f"guard_flags={flags}; {message}"
+        )
         self.model = model
         self.prompt_version = prompt_version
         self.attempts = attempts
+        self.guard_flag_codes = guard_flag_codes
 
 
 class LlmScoreLayer:
@@ -105,10 +126,10 @@ class LlmScoreLayer:
     async def score(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> LlmScoreResult:
         """Ask the model for a structured score over guarded job text."""
-        if not job.title and not job.description:
+        if not any(text and text.strip() for text in (job.title, job.description)):
             # Nothing to score: asking the model about an empty listing
             # wastes a call and invites hallucinated reasoning.
             raise ScoreLayerUnavailableError(
@@ -122,12 +143,15 @@ class LlmScoreLayer:
         guard_flag_codes = tuple(flag.code for flag in payload.flags)
 
         last_error = "no attempts made"
+        total_duration_ms = 0
         for attempt in range(1, MAX_ATTEMPTS + 1):
             request = CompletionRequest(
-                system_prompt=payload.instructions,
-                prompt=(
-                    untrusted_prompt if attempt == 1 else untrusted_prompt + REPAIR_NOTE
+                system_prompt=(
+                    payload.instructions
+                    if attempt == 1
+                    else payload.instructions + REPAIR_NOTE
                 ),
+                prompt=untrusted_prompt,
                 response_schema=LLM_RESPONSE_SCHEMA,
             )
             try:
@@ -135,9 +159,14 @@ class LlmScoreLayer:
             except AIProviderError as error:
                 # A dead or unreachable provider is not worth retrying on
                 # the same request; the pipeline records a skip instead.
+                flags = ",".join(guard_flag_codes) or "none"
                 raise ScoreLayerUnavailableError(
-                    f"llm layer unavailable: {error}"
+                    "llm layer unavailable for "
+                    f"{self._provider.provider_name}/{self._provider.model} "
+                    f"with prompt {LLM_PROMPT_VERSION}; guard_flags={flags}: {error}"
                 ) from error
+
+            total_duration_ms += response.duration_ms
 
             try:
                 parsed = LlmScorePayload.model_validate_json(response.text)
@@ -152,7 +181,7 @@ class LlmScoreLayer:
                 explanation=parsed.reasoning,
                 model=response.model,
                 prompt_version=LLM_PROMPT_VERSION,
-                duration_ms=response.duration_ms,
+                duration_ms=total_duration_ms,
                 attempts=attempt,
                 guard_flag_codes=guard_flag_codes,
             )
@@ -162,12 +191,13 @@ class LlmScoreLayer:
             model=self._provider.model,
             prompt_version=LLM_PROMPT_VERSION,
             attempts=MAX_ATTEMPTS,
+            guard_flag_codes=guard_flag_codes,
         )
 
     def _build_payload(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> GuardedPayload:
         """Compose trusted instructions with guarded job text.
 
@@ -175,7 +205,7 @@ class LlmScoreLayer:
         the trusted instruction section; job title and description come
         from external providers and are always fenced.
         """
-        profile_summary = f"{profile.role_name} ({', '.join(profile.keywords)})"
+        profile_summary = build_profile_summary(profile)
         instructions = SCORING_INSTRUCTIONS.format(profile_summary=profile_summary)
 
         sections = [
@@ -184,6 +214,12 @@ class LlmScoreLayer:
                 ("job_title", job.title),
                 ("job_description", job.description),
             )
-            if text
+            if text and text.strip()
         ]
         return build_guarded_payload(instructions, sections)
+
+
+def build_profile_summary(profile: ScoringProfile) -> str:
+    """Return a bounded trusted profile representation for the model."""
+    summary = f"{profile.profile.role_name} ({', '.join(profile.keywords)})"
+    return summary[:MAX_PROFILE_SUMMARY_CHARS]
