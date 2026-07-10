@@ -9,7 +9,7 @@ job shapes are defined once and consumed by services.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
 
 from app.models.eligibility import EligibilityResult
 
@@ -58,7 +58,7 @@ class LayerOutcome(BaseModel):
 
     layer: str
     status: Literal["success", "skip", "failure"]
-    result: ScoreLayerResult | None = None
+    result: SerializeAsAny[ScoreLayerResult] | None = None
     duration_ms: int = Field(ge=0)
     failure_code: str | None = None
     failure_detail: str | None = None

@@ -10,8 +10,8 @@ from collections.abc import Callable
 
 import pytest
 
-from app.models.config import ProfileConfig
 from app.models.scoring import ScoreLayerResult
+from app.services.profiles import ProfileDetail
 from app.services.scoring_pipeline import (
     KeywordScoreLayer,
     PIPELINE_VERSION,
@@ -19,12 +19,13 @@ from app.services.scoring_pipeline import (
     ScoreJobInput,
     ScoreLayerRegistry,
     ScoreLayerUnavailableError,
+    ScoringProfile,
     WEIGHTS_VERSION,
     score_job,
 )
 
 
-MakeProfile = Callable[..., ProfileConfig]
+MakeProfile = Callable[..., ProfileDetail]
 
 
 class FakeScoreLayer:
@@ -35,22 +36,24 @@ class FakeScoreLayer:
         name: str,
         score: int = 50,
         error: Exception | None = None,
+        result_layer: str | None = None,
     ) -> None:
         self.name = name
         self.calls = 0
         self._score = score
         self._error = error
+        self._result_layer = result_layer or name
 
     async def score(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> ScoreLayerResult:
         self.calls += 1
         if self._error is not None:
             raise self._error
         return ScoreLayerResult(
-            layer=self.name,
+            layer=self._result_layer,
             algorithm_version="fake",
             score=self._score,
             explanation=f"{self.name} fake score",
@@ -107,6 +110,9 @@ def test_keyword_only_pipeline_scores_deterministically(
     assert result.status == "scored"
     assert result.score == 100
     assert [outcome.layer for outcome in result.layer_outcomes] == ["keyword"]
+
+    dumped_outcome = result.layer_outcomes[0].model_dump()
+    assert dumped_outcome["result"]["matched_title_terms"] == ("Python",)
 
 
 def test_aggregate_is_weighted_mean_of_successful_layers(
@@ -242,3 +248,25 @@ def test_duplicate_layer_names_are_rejected() -> None:
 
     with pytest.raises(ValueError):
         registry.register(FakeScoreLayer("semantic"), weight=0.5)
+
+
+@pytest.mark.parametrize("weight", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_layer_weights_are_rejected(weight: float) -> None:
+    registry = ScoreLayerRegistry()
+
+    with pytest.raises(ValueError, match="finite and positive"):
+        registry.register(FakeScoreLayer("semantic"), weight=weight)
+
+
+def test_mismatched_optional_layer_identity_is_recorded_as_failure(
+    make_profile: MakeProfile,
+) -> None:
+    fake = FakeScoreLayer("registered-name", result_layer="semantic")
+    registry = make_registry((fake, 1.0, False))
+
+    result = asyncio.run(score_job(python_job(), make_profile(), registry=registry))
+
+    outcome = result.layer_outcomes[1]
+    assert outcome.layer == "registered-name"
+    assert outcome.status == "failure"
+    assert "returned result for 'semantic'" in (outcome.failure_detail or "")

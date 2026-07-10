@@ -10,12 +10,16 @@ local model availability never prevents deterministic scoring.
 
 import time
 from dataclasses import dataclass
+import math
 from typing import Protocol
 
-from app.models.config import ProfileConfig
 from app.models.scoring import JobScoreResult, LayerOutcome, ScoreLayerResult
-from app.services.eligibility import check_eligibility
-from app.services.keyword_scoring import KEYWORD_LAYER_NAME, score_job_keywords
+from app.services.eligibility import EligibilityProfile, check_eligibility
+from app.services.keyword_scoring import (
+    KEYWORD_LAYER_NAME,
+    KeywordProfile,
+    score_job_keywords,
+)
 
 
 # Bump these when composition or weighting behavior changes, so persisted
@@ -62,6 +66,10 @@ class RequiredScoreLayerError(Exception):
     """Raised when a required layer fails: the run cannot produce a score."""
 
 
+class ScoringProfile(KeywordProfile, EligibilityProfile, Protocol):
+    """Profile aggregate shared by eligibility and every score layer."""
+
+
 class ScoreLayer(Protocol):
     """What the pipeline needs from any score layer implementation."""
 
@@ -70,7 +78,7 @@ class ScoreLayer(Protocol):
     async def score(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> ScoreLayerResult: ...
 
 
@@ -82,7 +90,7 @@ class KeywordScoreLayer:
     async def score(
         self,
         job: ScoreJobInput,
-        profile: ProfileConfig,
+        profile: ScoringProfile,
     ) -> ScoreLayerResult:
         """Run the synchronous keyword scorer behind the async layer protocol."""
         return score_job_keywords(job.title, job.description, profile)
@@ -115,8 +123,10 @@ class ScoreLayerRegistry:
         required: bool = False,
     ) -> None:
         """Add a layer to the pipeline with its weight and failure policy."""
-        if weight <= 0:
-            raise ValueError("score layer weight must be positive")
+        if not math.isfinite(weight) or weight <= 0:
+            raise ValueError("score layer weight must be finite and positive")
+        if not layer.name.strip():
+            raise ValueError("score layer name must not be blank")
         if any(entry.layer.name == layer.name for entry in self._layers):
             raise ValueError(f"score layer {layer.name!r} is already registered")
         self._layers.append(
@@ -141,7 +151,7 @@ default_score_layer_registry.register(
 
 async def score_job(
     job: ScoreJobInput,
-    profile: ProfileConfig,
+    profile: ScoringProfile,
     *,
     registry: ScoreLayerRegistry = default_score_layer_registry,
 ) -> JobScoreResult:
@@ -230,12 +240,16 @@ async def score_job(
 async def _run_layer(
     entry: RegisteredScoreLayer,
     job: ScoreJobInput,
-    profile: ProfileConfig,
+    profile: ScoringProfile,
 ) -> LayerOutcome:
     """Run one layer and translate its outcome into the auditable shape."""
     started = time.perf_counter()
     try:
         result = await entry.layer.score(job, profile)
+        if result.layer != entry.layer.name:
+            raise ValueError(
+                f"layer {entry.layer.name!r} returned result for {result.layer!r}"
+            )
     except ScoreLayerUnavailableError as error:
         if entry.required:
             raise RequiredScoreLayerError(
