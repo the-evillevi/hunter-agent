@@ -70,7 +70,9 @@ def test_to_json_resume_maps_standard_keys(compiler, detail) -> None:
     assert [work["name"] for work in document["work"]] == ["IBM", "Oracle"]
     assert document["work"][0]["position"] == "Application Developer"
     assert document["work"][0]["startDate"] == "2023-10"
-    assert document["work"][0]["endDate"] == ""  # ongoing role
+    # Ongoing role: the schema requires iso8601 endDate values when the key
+    # is present, so an open-ended job must omit it entirely.
+    assert "endDate" not in document["work"][0]
 
     assert document["skills"][0]["name"] == "Languages"
     assert "Python" in document["skills"][0]["keywords"]
@@ -179,3 +181,45 @@ def test_to_pdf_raises_clear_error_without_weasyprint(
 
     with pytest.raises(ResumeExportError, match="weasyprint"):
         compiler.to_pdf(detail)
+
+
+def test_to_json_resume_rejects_spec_violations(compiler, detail) -> None:
+    """A mapping that breaks the v1.0.0 schema must fail, not export."""
+    # An ongoing role encoded as end_date="" used to slip through as an
+    # empty endDate, which the schema's iso8601 pattern rejects.
+    experience = _section_of_type(detail, SectionType.experience)
+    experience.items[0].content["end_date"] = "not-a-date"
+
+    with pytest.raises(ResumeExportError, match="schema validation"):
+        compiler.to_json_resume(detail)
+
+
+def _hundred_item_detail(detail):
+    """Inflate the fixture resume to 100+ experience items for stress tests."""
+    inflated = detail.model_copy(deep=True)
+    experience = _section_of_type(inflated, SectionType.experience)
+    template_item = experience.items[0]
+    for index in range(110):
+        clone = template_item.model_copy(deep=True)
+        clone.id = 1000 + index
+        clone.order_idx = index + len(experience.items)
+        clone.content = dict(template_item.content) | {
+            "position": f"Engineer {index}",
+            "highlights": [f"Delivered project {index} end to end."],
+        }
+        experience.items.append(clone)
+    return inflated
+
+
+def test_to_pdf_handles_hundred_plus_items_within_size_limit(
+    compiler, detail
+) -> None:
+    inflated = _hundred_item_detail(detail)
+
+    try:
+        pdf_bytes = compiler.to_pdf(inflated)
+    except ResumeExportError as error:
+        pytest.skip(f"PDF native dependencies unavailable: {error}")
+
+    assert pdf_bytes.startswith(b"%PDF")
+    assert len(pdf_bytes) < MAX_PDF_BYTES

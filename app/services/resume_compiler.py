@@ -7,6 +7,9 @@ behind one class means routes and future exporters never touch section
 mapping logic directly.
 """
 
+import json
+
+import jsonschema
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import PROJECT_ROOT
@@ -27,6 +30,14 @@ class ResumeExportError(Exception):
 _JINJA_ENVIRONMENT = Environment(
     loader=FileSystemLoader(PROJECT_ROOT / "app" / "templates"),
     autoescape=select_autoescape(["html"]),
+)
+
+# Committed copy of https://jsonresume.org/schema/ v1.0.0, so exports are
+# validated against the exact spec version the mappers target.
+_JSON_RESUME_SCHEMA = json.loads(
+    (PROJECT_ROOT / "app" / "schemas" / "json_resume_schema.json").read_text(
+        encoding="utf-8"
+    )
 )
 
 
@@ -75,6 +86,13 @@ class ResumeCompiler:
             mapper = _JSON_RESUME_SECTION_MAPPERS.get(section.section_type)
             if mapper is not None:
                 mapper(section, document)
+
+        try:
+            jsonschema.validate(document, _JSON_RESUME_SCHEMA)
+        except jsonschema.ValidationError as error:
+            raise ResumeExportError(
+                f"JSON Resume export failed v1.0.0 schema validation: {error.message}"
+            ) from error
 
         return document
 
@@ -174,16 +192,21 @@ def _map_summary(section: ResumeSectionDetail, document: dict) -> None:
 def _map_experience(section: ResumeSectionDetail, document: dict) -> None:
     for item in section.items:
         content = item.content
-        document["work"].append(
-            {
-                "name": content.get("company", ""),
-                "position": content.get("position", ""),
-                "location": content.get("location", ""),
-                "startDate": content.get("start_date") or "",
-                "endDate": content.get("end_date") or "",
-                "highlights": content.get("highlights", []),
-            }
-        )
+        entry = {
+            "name": content.get("company", ""),
+            "position": content.get("position", ""),
+            "location": content.get("location", ""),
+            "highlights": content.get("highlights", []),
+        }
+        # The schema requires iso8601 values when a date key is present, so
+        # facts without dates must omit the keys rather than send "".
+        for source_key, target_key in (
+            ("start_date", "startDate"),
+            ("end_date", "endDate"),
+        ):
+            if content.get(source_key):
+                entry[target_key] = content[source_key]
+        document["work"].append(entry)
 
 
 def _map_education(section: ResumeSectionDetail, document: dict) -> None:
