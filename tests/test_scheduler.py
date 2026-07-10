@@ -81,16 +81,17 @@ def test_next_run_time_picks_the_earliest_upcoming_slot() -> None:
         2026, 7, 10, 18, 0, tzinfo=tz
     )
 
-
-def test_missed_run_waits_for_the_next_slot() -> None:
-    """A reference just after a slot resolves to the next one, not catch-up."""
-    scheduler = build_pipeline_scheduler(make_config(), fake_pipeline)
-    tz = ZoneInfo(TIMEZONE)
-
+    # Just after a slot the next fire is the following one — a missed run
+    # waits for the next scheduled slot rather than catching up.
     just_after_evening = datetime(2026, 7, 10, 18, 0, 1, tzinfo=tz)
     assert next_scheduled_run_time(scheduler, just_after_evening) == datetime(
         2026, 7, 11, 8, 0, tzinfo=tz
     )
+
+
+def test_default_run_pipeline_is_the_scheduled_body() -> None:
+    scheduler = build_pipeline_scheduler(make_config(runs_at=["08:00"]))
+    assert scheduler.get_jobs()[0].func is run_scheduled_pipeline
 
 
 def test_registered_job_awaits_the_injected_pipeline() -> None:
@@ -144,7 +145,7 @@ class FakeScheduler:
 def test_lifespan_starts_and_stops_the_scheduler(monkeypatch) -> None:
     fake = FakeScheduler()
     monkeypatch.setenv("HUNTER_SCHEDULER_ENABLED", "1")
-    monkeypatch.setattr(app_main, "build_pipeline_scheduler", lambda config, body: fake)
+    monkeypatch.setattr(app_main, "build_pipeline_scheduler", lambda config: fake)
 
     with TestClient(app):
         assert fake.started is True
@@ -157,11 +158,9 @@ def test_lifespan_starts_and_stops_the_scheduler(monkeypatch) -> None:
 
 def test_dashboard_panel_shows_next_scheduled_run(client, monkeypatch) -> None:
     scheduler = build_pipeline_scheduler(make_config(), fake_pipeline)
-    app.state.scheduler = scheduler
-    try:
-        response = client.get("/pipeline/partials/runs")
-    finally:
-        app.state.scheduler = None
+    monkeypatch.setattr(app.state, "scheduler", scheduler, raising=False)
+
+    response = client.get("/pipeline/partials/runs")
 
     assert response.status_code == 200
     assert "Next scheduled run:" in response.text

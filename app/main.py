@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from importlib import metadata
+import logging
 import os
 import tomllib
 
@@ -7,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.config import PROJECT_ROOT, load_config
-from app.services.scheduler import build_pipeline_scheduler, run_scheduled_pipeline
+from app.services.scheduler import build_pipeline_scheduler
 from app.routes import (
     applications,
     companies,
@@ -54,16 +55,22 @@ async def lifespan(app: FastAPI):
     """
     scheduler = getattr(app.state, "scheduler", None)
     if scheduler is None and os.environ.get("HUNTER_SCHEDULER_ENABLED", "1") != "0":
-        scheduler = build_pipeline_scheduler(
-            load_config().scheduler, run_scheduled_pipeline
-        )
-        if scheduler is not None:
-            scheduler.start()
+        try:
+            scheduler = build_pipeline_scheduler(load_config().scheduler)
+            if scheduler is not None:
+                scheduler.start()
+        except Exception:
+            # A broken config must not make the whole dashboard
+            # unreachable; the app serves and the scheduler stays off.
+            logging.getLogger(__name__).exception(
+                "pipeline scheduler failed to start; continuing without it"
+            )
+            scheduler = None
     app.state.scheduler = scheduler
     try:
         yield
     finally:
-        if scheduler is not None:
+        if scheduler is not None and getattr(scheduler, "running", True):
             scheduler.shutdown(wait=False)
         app.state.scheduler = None
 

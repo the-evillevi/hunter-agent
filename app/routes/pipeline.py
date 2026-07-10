@@ -22,7 +22,7 @@ from app.services.pipeline import (
     list_recent_pipeline_runs,
     run_job_pipeline,
 )
-from app.services.scheduler import next_scheduled_run_time
+from app.services.scheduler import next_scheduled_run_time_for
 
 
 router = APIRouter()
@@ -94,8 +94,6 @@ def pipeline_runs_partial(
         "_pipeline_runs.html",
         {
             "pipeline_runs": list_recent_pipeline_runs(session),
-            "next_run_time": next_scheduled_run_time(
-                getattr(request.app.state, "scheduler", None)
-            ),
+            "next_run_time": next_scheduled_run_time_for(request.app.state),
         },
     )
