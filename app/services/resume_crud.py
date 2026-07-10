@@ -16,7 +16,9 @@ from sqlalchemy import distinct
 from sqlmodel import Session, func, select
 
 from app.models.resume import (
+    ExportFormat,
     ResumeDetail,
+    ResumeExportProfile,
     ResumeItem,
     ResumeItemDetail,
     ResumeListItem,
@@ -41,6 +43,7 @@ def list_resumes(session: Session, limit: int = 25) -> list[ResumeListItem]:
         )
         .join(ResumeSection, ResumeSection.profile_id == ResumeProfile.id, isouter=True)
         .join(ResumeItem, ResumeItem.section_id == ResumeSection.id, isouter=True)
+        .where(ResumeProfile.deleted_at.is_(None))
         .group_by(ResumeProfile.id)
         .order_by(ResumeProfile.created_at.desc(), ResumeProfile.id.desc())
         .limit(limit)
@@ -72,7 +75,7 @@ def list_resumes(session: Session, limit: int = 25) -> list[ResumeListItem]:
 def get_resume_detail(session: Session, resume_id: int) -> ResumeDetail | None:
     """Return one profile with its ordered sections and decoded items."""
     profile = session.get(ResumeProfile, resume_id)
-    if profile is None:
+    if profile is None or profile.deleted_at is not None:
         return None
 
     sections = session.exec(
@@ -174,6 +177,59 @@ def add_item(
     session.add(item)
     session.flush()
     return item
+
+
+def soft_delete_profile(session: Session, *, profile_id: int) -> ResumeProfile:
+    """Hide a profile from list/detail queries while keeping its audit rows.
+
+    Cascading hard deletes are reserved for the database layer (ON DELETE);
+    application code always soft-deletes so tailor history stays queryable.
+    """
+    profile = session.get(ResumeProfile, profile_id)
+    if profile is None:
+        raise LookupError(f"Resume profile {profile_id} was not found")
+
+    profile.deleted_at = datetime.now()
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+    return profile
+
+
+def create_export_profile(
+    session: Session,
+    *,
+    name: str,
+    format: ExportFormat,
+    include_scores: bool = False,
+    section_filters: list[SectionType] | None = None,
+) -> ResumeExportProfile:
+    """Persist a saved export configuration for the compiler layer."""
+    export_profile = ResumeExportProfile(
+        name=name,
+        format=ExportFormat(format),
+        include_scores=include_scores,
+        section_filters=(
+            None
+            if section_filters is None
+            else json.dumps([section_type.value for section_type in section_filters])
+        ),
+    )
+    session.add(export_profile)
+    session.commit()
+    session.refresh(export_profile)
+    return export_profile
+
+
+def list_export_profiles(session: Session) -> list[ResumeExportProfile]:
+    """Return saved export configurations, newest first."""
+    return list(
+        session.exec(
+            select(ResumeExportProfile).order_by(
+                ResumeExportProfile.created_at.desc(), ResumeExportProfile.id.desc()
+            )
+        ).all()
+    )
 
 
 def update_item_score(

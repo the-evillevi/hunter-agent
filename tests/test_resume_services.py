@@ -6,13 +6,16 @@ import pytest
 from pydantic import ValidationError
 from sqlmodel import Session
 
-from app.models.resume import SectionType
+from app.models.resume import ExportFormat, SectionType
 from app.services.resume_crud import (
     add_item,
     add_section,
+    create_export_profile,
     create_resume_profile,
     get_resume_detail,
+    list_export_profiles,
     list_resumes,
+    soft_delete_profile,
     update_item_score,
 )
 from app.services.resume_import import import_resume, load_resume_document
@@ -122,6 +125,47 @@ def test_update_item_score_rejects_out_of_range_score(session: Session) -> None:
 
     with pytest.raises(ValueError):
         update_item_score(session, item_id=item.id, score=150.0)
+
+
+def test_soft_deleted_profile_is_hidden_from_list_and_detail(
+    session: Session,
+) -> None:
+    profile = create_resume_profile(session, name="master")
+    session.commit()
+
+    deleted = soft_delete_profile(session, profile_id=profile.id)
+
+    assert deleted.deleted_at is not None
+    assert list_resumes(session) == []
+    assert get_resume_detail(session, resume_id=profile.id) is None
+
+
+def test_soft_delete_profile_raises_for_missing_profile(session: Session) -> None:
+    with pytest.raises(LookupError):
+        soft_delete_profile(session, profile_id=999)
+
+
+def test_export_profile_crud_round_trip(session: Session) -> None:
+    create_export_profile(
+        session,
+        name="pdf-core",
+        format=ExportFormat.pdf,
+        include_scores=True,
+        section_filters=[SectionType.experience, SectionType.skills],
+    )
+    create_export_profile(session, name="full-json", format=ExportFormat.json)
+
+    export_profiles = list_export_profiles(session)
+
+    assert [profile.name for profile in export_profiles] == [
+        "full-json",
+        "pdf-core",
+    ]
+    assert export_profiles[1].section_filters_list() == [
+        SectionType.experience,
+        SectionType.skills,
+    ]
+    assert export_profiles[0].section_filters_list() is None
 
 
 def test_load_resume_document_validates_fixture() -> None:

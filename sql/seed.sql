@@ -587,33 +587,74 @@ INSERT INTO jobs (id, profile_id, title, company_id, location_id, url, source_id
 -- applications
 INSERT INTO applications (id, job_id, cv_path, status, applied_at, last_updated, notes) VALUES (1, 1, '/Users/evillevi/cv/master.docx', 'pending', NULL, '2026-06-18 23:08:34', 'Tailor CV to highlight PyTorch and LLM experience. Prepare brief note about previous work with recommendation systems.');
 
--- Resume profiles: one master resume with a couple of representative facts.
--- The full master resume is imported from cvs/resume.json via
--- `uv run python -m app.services.resume_import`.
-INSERT INTO resume_profiles (name, created_at, updated_at)
-VALUES ('seed-master', datetime('now'), datetime('now'));
+-- Resume profiles: three synthetic profiles (two masters plus one tailored
+-- variant) with 20+ items so list/detail/tailor flows have realistic data
+-- out of the box. A personal master resume can still be imported from
+-- cvs/resume.json via `uv run python -m app.services.resume_import`.
+INSERT INTO resume_profiles (id, name, created_at, updated_at)
+VALUES (1, 'seed-master', datetime('now'), datetime('now'));
 
-INSERT INTO resume_sections (profile_id, section_type, title, order_idx)
-VALUES (1, 'experience', 'Work Experience', 0);
+INSERT INTO resume_profiles (id, name, created_at, updated_at)
+VALUES (2, 'seed-data-master', datetime('now'), datetime('now'));
 
-INSERT INTO resume_sections (profile_id, section_type, title, order_idx)
-VALUES (1, 'skills', 'Technical Skills', 1);
+INSERT INTO resume_profiles (id, name, base_resume_id, job_id, created_at, updated_at)
+VALUES (3, 'seed-tailored-ai-ml-engineer', 1, 1, datetime('now'), datetime('now'));
 
+-- seed-master sections
+INSERT INTO resume_sections (id, profile_id, section_type, title, order_idx)
+VALUES
+    (1, 1, 'summary', 'Summary', 0),
+    (2, 1, 'experience', 'Work Experience', 1),
+    (3, 1, 'skills', 'Technical Skills', 2),
+    (4, 1, 'education', 'Education', 3),
+    (5, 1, 'projects', 'Projects', 4);
+
+-- seed-data-master sections
+INSERT INTO resume_sections (id, profile_id, section_type, title, order_idx)
+VALUES
+    (6, 2, 'experience', 'Work Experience', 0),
+    (7, 2, 'skills', 'Technical Skills', 1);
+
+-- seed-tailored-ai-ml-engineer sections
+INSERT INTO resume_sections (id, profile_id, section_type, title, order_idx)
+VALUES
+    (8, 3, 'experience', 'Work Experience', 0),
+    (9, 3, 'skills', 'Technical Skills', 1);
+
+-- seed-master items
 INSERT INTO resume_items (section_id, content, order_idx)
-VALUES (
-    1,
-    '{"position": "Application Developer", "company": "IBM", "highlights": ["Designed and implemented automated ETL workflows."]}',
-    0
-);
+VALUES
+    (1, '{"text": "Full-stack engineer with six years building data-heavy web products."}', 0),
+    (2, '{"position": "Application Developer", "company": "IBM", "highlights": ["Designed and implemented automated ETL workflows.", "Cut nightly batch runtime by 40%."]}', 0),
+    (2, '{"position": "Backend Engineer", "company": "Oracle", "highlights": ["Built REST APIs for the provisioning platform."]}', 1),
+    (2, '{"position": "Software Engineer", "company": "Globant", "highlights": ["Delivered client dashboards with React and FastAPI."]}', 2),
+    (2, '{"position": "Junior Developer", "company": "Softtek", "highlights": ["Maintained internal billing tools."]}', 3),
+    (2, '{"position": "Freelance Developer", "company": "Self-employed", "highlights": ["Shipped small-business sites and automations."]}', 4),
+    (3, '{"category": "Languages", "keywords": ["Python", "TypeScript", "SQL"]}', 0),
+    (3, '{"category": "Frameworks", "keywords": ["FastAPI", "React", "SQLModel"]}', 1),
+    (3, '{"category": "Data", "keywords": ["PostgreSQL", "SQLite", "Airflow"]}', 2),
+    (3, '{"category": "Tooling", "keywords": ["Docker", "GitHub Actions", "uv"]}', 3),
+    (4, '{"degree": "BSc Computer Science", "institution": "UNAM", "year": "2018"}', 0),
+    (4, '{"degree": "ML Specialization", "institution": "Coursera", "year": "2021"}', 1),
+    (5, '{"name": "hunter-agent", "description": "Job-hunting automation agent with LLM scoring."}', 0),
+    (5, '{"name": "etl-kit", "description": "Reusable ETL pipeline toolkit."}', 1),
+    (5, '{"name": "resume-forge", "description": "Structured resume compiler."}', 2);
 
+-- seed-data-master items
+INSERT INTO resume_items (section_id, content, order_idx)
+VALUES
+    (6, '{"position": "Data Engineer", "company": "Kavak", "highlights": ["Owned the ingestion layer for vehicle pricing data."]}', 0),
+    (6, '{"position": "Analytics Engineer", "company": "Bitso", "highlights": ["Modeled trading metrics in dbt."]}', 1),
+    (6, '{"position": "BI Developer", "company": "Cemex", "highlights": ["Automated executive reporting."]}', 2),
+    (7, '{"category": "Data", "keywords": ["Spark", "dbt", "BigQuery"]}', 0),
+    (7, '{"category": "Languages", "keywords": ["Python", "SQL", "Scala"]}', 1);
+
+-- seed-tailored-ai-ml-engineer items (scored during a tailoring run)
 INSERT INTO resume_items (section_id, content, relevance_score, score_reasoning, order_idx)
-VALUES (
-    2,
-    '{"category": "Languages", "keywords": ["Python", "TypeScript"]}',
-    90,
-    'Seed example of a scored item.',
-    0
-);
+VALUES
+    (8, '{"position": "Application Developer", "company": "IBM", "highlights": ["Designed and implemented automated ETL workflows."]}', 88, 'ETL automation maps directly to the ML pipeline requirement.', 0),
+    (8, '{"position": "Backend Engineer", "company": "Oracle", "highlights": ["Built REST APIs for the provisioning platform."]}', 62, 'API experience supports the model-serving responsibilities.', 1),
+    (9, '{"category": "Languages", "keywords": ["Python", "TypeScript"]}', 90, 'Python is the core language for this role.', 0);
 
 -- blacklist
 INSERT INTO blacklist (id, company_id, job_id, reason, added_at) VALUES (1, 1, NULL, 'Defense contractor — ethical concerns regarding military and surveillance contracts. Not aligned with personal values.', '2026-06-18 23:08:34');

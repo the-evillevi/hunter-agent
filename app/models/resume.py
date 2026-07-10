@@ -11,7 +11,7 @@ import json
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, Column, ForeignKey, Integer
 from sqlmodel import Field, SQLModel
 
 
@@ -33,22 +33,43 @@ class SectionType(StrEnum):
 _SECTION_TYPE_SQL_LIST = ", ".join(f"'{section_type}'" for section_type in SectionType)
 
 
+class ExportFormat(StrEnum):
+    json = "json"
+    json_resume = "json_resume"
+    html = "html"
+    pdf = "pdf"
+
+
+_EXPORT_FORMAT_SQL_LIST = ", ".join(f"'{fmt}'" for fmt in ExportFormat)
+
+
 class ResumeProfile(SQLModel, table=True):
     """Resume profiles table from sql/hunter-agent.sql.
 
     ``base_resume_id`` is NULL for master resumes and points at the source
     profile for tailored variants. ``job_id`` is set only on variants that
     were tailored for one specific job.
+
+    ``deleted_at`` implements soft deletes: profiles keep their audit trail
+    but disappear from list/detail queries once the timestamp is set. Deleting
+    a base resume must not destroy its variants, so the self-reference nulls
+    out instead of cascading.
     """
 
     __tablename__ = "resume_profiles"
 
     id: int | None = Field(default=None, primary_key=True)
     name: str
-    base_resume_id: int | None = Field(default=None, foreign_key="resume_profiles.id")
+    base_resume_id: int | None = Field(
+        default=None,
+        sa_column=Column(
+            Integer, ForeignKey("resume_profiles.id", ondelete="SET NULL")
+        ),
+    )
     job_id: int | None = Field(default=None, foreign_key="jobs.id")
     created_at: datetime = Field(default_factory=datetime.now)
     updated_at: datetime = Field(default_factory=datetime.now)
+    deleted_at: datetime | None = None
 
 
 class ResumeSection(SQLModel, table=True):
@@ -63,7 +84,14 @@ class ResumeSection(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    profile_id: int = Field(foreign_key="resume_profiles.id", index=True)
+    profile_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("resume_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     section_type: SectionType
     title: str
     order_idx: int = 0
@@ -85,7 +113,14 @@ class ResumeItem(SQLModel, table=True):
     )
 
     id: int | None = Field(default=None, primary_key=True)
-    section_id: int = Field(foreign_key="resume_sections.id", index=True)
+    section_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("resume_sections.id", ondelete="CASCADE"),
+            nullable=False,
+            index=True,
+        )
+    )
     content: str
     relevance_score: float | None = None
     score_reasoning: str | None = None
@@ -102,12 +137,53 @@ class ResumeTailorRun(SQLModel, table=True):
     __tablename__ = "resume_tailor_runs"
 
     id: int | None = Field(default=None, primary_key=True)
-    source_profile_id: int = Field(foreign_key="resume_profiles.id")
-    output_profile_id: int = Field(foreign_key="resume_profiles.id")
+    source_profile_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("resume_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
+    output_profile_id: int = Field(
+        sa_column=Column(
+            Integer,
+            ForeignKey("resume_profiles.id", ondelete="CASCADE"),
+            nullable=False,
+        )
+    )
     job_id: int = Field(foreign_key="jobs.id")
     model: str
     prompt_version: str
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+class ResumeExportProfile(SQLModel, table=True):
+    """Saved export configuration: which format and sections to compile.
+
+    ``section_filters`` stores a JSON-encoded list of section type names, or
+    NULL to export every section.
+    """
+
+    __tablename__ = "resume_export_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            f"format IN ({_EXPORT_FORMAT_SQL_LIST})",
+            name="ck_resume_export_profiles_format",
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    name: str
+    format: ExportFormat
+    include_scores: bool = False
+    section_filters: str | None = None
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    def section_filters_list(self) -> list[SectionType] | None:
+        """Decode the JSON filter payload for the compiler layer."""
+        if self.section_filters is None:
+            return None
+        return [SectionType(name) for name in json.loads(self.section_filters)]
 
 
 class ResumeListItem(SQLModel):

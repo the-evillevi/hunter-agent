@@ -4,6 +4,8 @@ PRAGMA foreign_keys = ON;
 
 BEGIN TRANSACTION;
 
+DROP TABLE IF EXISTS resume_export_profiles;
+
 DROP TABLE IF EXISTS resume_tailor_runs;
 
 DROP TABLE IF EXISTS resume_items;
@@ -213,18 +215,23 @@ CREATE TABLE blacklist (
 -- Resume storage: structured CV facts instead of opaque file paths.
 -- A profile is one resume version; base_resume_id points at the master
 -- for tailored variants, and job_id marks which job a variant targets.
+-- deleted_at implements soft deletes: application code hides profiles
+-- with a timestamp instead of destroying their audit trail. Deleting a
+-- base resume must not destroy its variants, so the self-reference
+-- nulls out instead of cascading.
 CREATE TABLE resume_profiles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
-  base_resume_id INTEGER REFERENCES resume_profiles (id),
+  base_resume_id INTEGER REFERENCES resume_profiles (id) ON DELETE SET NULL,
   job_id INTEGER REFERENCES jobs (id),
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted_at DATETIME
 );
 
 CREATE TABLE resume_sections (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
+  profile_id INTEGER NOT NULL REFERENCES resume_profiles (id) ON DELETE CASCADE,
   section_type TEXT NOT NULL CHECK (
     section_type IN (
       'basics',
@@ -245,7 +252,7 @@ CREATE TABLE resume_sections (
 -- score_reasoning stay NULL until a tailoring run scores the item.
 CREATE TABLE resume_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  section_id INTEGER NOT NULL REFERENCES resume_sections (id),
+  section_id INTEGER NOT NULL REFERENCES resume_sections (id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   relevance_score REAL CHECK (
     relevance_score IS NULL
@@ -258,11 +265,25 @@ CREATE TABLE resume_items (
 -- Audit log: one row per tailoring run that produced a variant for a job.
 CREATE TABLE resume_tailor_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  source_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
-  output_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id),
+  source_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id) ON DELETE CASCADE,
+  output_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id) ON DELETE CASCADE,
   job_id INTEGER NOT NULL REFERENCES jobs (id),
   model TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Saved export configurations: which format and sections to compile.
+-- section_filters holds a JSON-encoded list of section type names, or
+-- NULL to export every section.
+CREATE TABLE resume_export_profiles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  format TEXT NOT NULL CHECK (
+    format IN ('json', 'json_resume', 'html', 'pdf')
+  ),
+  include_scores BOOLEAN NOT NULL DEFAULT 0 CHECK (include_scores IN (0, 1)),
+  section_filters TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
