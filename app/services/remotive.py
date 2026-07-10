@@ -97,7 +97,11 @@ class RemotiveJobSourceAdapter:
     async def _get_json(self, params: dict[str, str]) -> Mapping[str, Any]:
         try:
             if self._client is not None:
-                response = await self._client.get(self._base_url, params=params)
+                response = await self._client.get(
+                    self._base_url,
+                    params=params,
+                    timeout=self._timeout,
+                )
                 return _response_json(response)
 
             headers = {
@@ -170,7 +174,10 @@ def _matches_excluded_keyword(
         )
         if value is not None
     ).casefold()
-    return any(keyword.strip().casefold() in haystack for keyword in exclude_keywords)
+    normalized_keywords = (
+        keyword.strip().casefold() for keyword in exclude_keywords if keyword.strip()
+    )
+    return any(keyword in haystack for keyword in normalized_keywords)
 
 
 def _matches_location_types(

@@ -84,6 +84,28 @@ def test_remotive_adapter_builds_request_from_source_query() -> None:
     assert seen_request.url.params["limit"] == "10"
 
 
+def test_remotive_adapter_applies_timeout_to_injected_client() -> None:
+    seen_timeout: dict[str, float | None] | None = None
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal seen_timeout
+        seen_timeout = request.extensions.get("timeout")
+        return httpx.Response(200, json={"jobs": []}, request=request)
+
+    async def run_fetch() -> None:
+        async with httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            timeout=None,
+        ) as client:
+            adapter = RemotiveJobSourceAdapter(client=client, timeout=3.5)
+            await adapter.fetch(JobSourceRunContext())
+
+    asyncio.run(run_fetch())
+
+    assert seen_timeout is not None
+    assert set(seen_timeout.values()) == {3.5}
+
+
 def test_remotive_adapter_normalizes_representative_job() -> None:
     adapter = RemotiveJobSourceAdapter()
 
@@ -145,6 +167,19 @@ def test_remotive_adapter_skips_malformed_and_excluded_jobs(caplog) -> None:
     assert "Skipping Remotive job id=3 title='AI Engineer'" in caplog.text
     assert "job is missing title, company, or location" in caplog.text
     assert "job payload is not an object" in caplog.text
+
+
+def test_remotive_adapter_ignores_blank_excluded_keywords() -> None:
+    async def run_fetch() -> Sequence[Mapping[str, Any]]:
+        async with make_remotive_client({"jobs": [remotive_job()]}) as client:
+            adapter = RemotiveJobSourceAdapter(client=client)
+            return await adapter.fetch(
+                JobSourceRunContext(exclude_keywords=("", "   "))
+            )
+
+    jobs = asyncio.run(run_fetch())
+
+    assert len(jobs) == 1
 
 
 def test_remotive_adapter_filters_non_remote_location_types() -> None:
