@@ -112,6 +112,31 @@ def test_request_overrides_replace_role_defaults() -> None:
     assert captured["options"] == {"temperature": 0.9, "num_predict": 64}
 
 
+def test_request_uses_configured_base_url_and_timeout() -> None:
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["url"] = str(request.url)
+        captured["timeout"] = request.extensions["timeout"]
+        return httpx.Response(200, json=ollama_body())
+
+    provider = OllamaCompletionProvider(
+        make_ollama_config(),
+        "scorer",
+        timeout_seconds=7.5,
+        transport=httpx.MockTransport(handler),
+    )
+    asyncio.run(provider.complete(CompletionRequest(prompt="hi")))
+
+    assert captured["url"] == "http://localhost:11434/api/chat"
+    assert captured["timeout"] == {
+        "connect": 7.5,
+        "read": 7.5,
+        "write": 7.5,
+        "pool": 7.5,
+    }
+
+
 def test_response_schema_passes_through_as_format() -> None:
     captured: dict[str, Any] = {}
     schema = {"type": "object", "properties": {"score": {"type": "integer"}}}
@@ -142,6 +167,27 @@ def test_tailor_role_selects_tailor_model() -> None:
     assert provider.model == "qwen2.5:14b"
     assert captured["model"] == "qwen2.5:14b"
     assert captured["options"] == {"temperature": 0.3, "num_predict": 2048}
+
+
+def test_scorer_and_tailor_roles_can_run_sequentially() -> None:
+    requested_models: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requested_models.append(payload["model"])
+        return httpx.Response(200, json=ollama_body(model=payload["model"]))
+
+    transport = httpx.MockTransport(handler)
+    scorer = make_provider(transport, role="scorer")
+    tailor = make_provider(transport, role="tailor")
+
+    async def complete_in_sequence() -> None:
+        await scorer.complete(CompletionRequest(prompt="score"))
+        await tailor.complete(CompletionRequest(prompt="tailor"))
+
+    asyncio.run(complete_in_sequence())
+
+    assert requested_models == ["qwen2.5:7b", "qwen2.5:14b"]
 
 
 def test_connect_failure_maps_to_typed_error_with_identity() -> None:
@@ -182,6 +228,17 @@ def test_http_error_status_maps_to_typed_error_with_status() -> None:
     assert excinfo.value.status_code == 500
 
 
+def test_redirect_status_maps_to_typed_http_error() -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(307, headers={"location": "/other"})
+    )
+
+    with pytest.raises(AIHTTPError) as excinfo:
+        asyncio.run(make_provider(transport).complete(CompletionRequest(prompt="hi")))
+
+    assert excinfo.value.status_code == 307
+
+
 def test_non_json_body_maps_to_response_error() -> None:
     transport = httpx.MockTransport(
         lambda request: httpx.Response(200, text="not json at all")
@@ -205,6 +262,43 @@ def test_missing_message_content_maps_to_response_error() -> None:
 
     with pytest.raises(AIResponseError):
         asyncio.run(make_provider(transport).complete(CompletionRequest(prompt="hi")))
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        ollama_body(message={"role": "assistant", "content": "   "}),
+        ollama_body(model=""),
+        ollama_body(model=42),
+    ],
+)
+def test_blank_content_or_invalid_model_maps_to_response_error(
+    body: dict[str, Any],
+) -> None:
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, json=body))
+
+    with pytest.raises(AIResponseError):
+        asyncio.run(make_provider(transport).complete(CompletionRequest(prompt="hi")))
+
+
+@pytest.mark.parametrize("timeout", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_timeout_is_rejected(timeout: float) -> None:
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json=ollama_body())
+    )
+
+    with pytest.raises(ValueError, match="finite and positive"):
+        OllamaCompletionProvider(
+            make_ollama_config(),
+            "scorer",
+            timeout_seconds=timeout,
+            transport=transport,
+        )
+
+
+def test_invalid_runtime_role_is_rejected() -> None:
+    with pytest.raises(ValueError, match="unsupported Ollama role"):
+        OllamaCompletionProvider(make_ollama_config(), "invalid")  # type: ignore[arg-type]
 
 
 def test_unrecognized_done_reason_degrades_to_unknown() -> None:

@@ -8,6 +8,7 @@ MockTransport, so nothing here ever needs a live server.
 """
 
 import json
+import math
 import time
 from typing import Any, Literal
 
@@ -55,7 +56,14 @@ class OllamaCompletionProvider:
         timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
         transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
-        role_config = config.scorer if role == "scorer" else config.tailor
+        if role == "scorer":
+            role_config = config.scorer
+        elif role == "tailor":
+            role_config = config.tailor
+        else:
+            raise ValueError(f"unsupported Ollama role: {role!r}")
+        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
+            raise ValueError("Ollama timeout must be finite and positive")
         self.model = role_config.model
         self._base_url = str(config.base_url).rstrip("/")
         self._temperature = role_config.temperature
@@ -92,7 +100,7 @@ class OllamaCompletionProvider:
 
         duration_ms = max(0, round((time.perf_counter() - started) * 1000))
 
-        if response.status_code >= 400:
+        if not response.is_success:
             raise AIHTTPError(
                 f"Ollama returned HTTP {response.status_code}",
                 provider=self.provider_name,
@@ -156,9 +164,18 @@ class OllamaCompletionProvider:
             )
 
         message = body.get("message")
-        if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, str) or not content.strip():
             raise AIResponseError(
-                "Ollama response is missing message.content",
+                "Ollama response is missing non-blank message.content",
+                provider=self.provider_name,
+                model=self.model,
+            )
+
+        response_model = body.get("model", self.model)
+        if not isinstance(response_model, str) or not response_model.strip():
+            raise AIResponseError(
+                "Ollama response contains an invalid model identity",
                 provider=self.provider_name,
                 model=self.model,
             )
@@ -175,9 +192,9 @@ class OllamaCompletionProvider:
         }
 
         return CompletionResponse(
-            text=message["content"],
+            text=content,
             provider=self.provider_name,
-            model=str(body.get("model", self.model)),
+            model=response_model,
             duration_ms=duration_ms,
             finish_reason=FINISH_REASONS.get(str(body.get("done_reason")), "unknown"),
             raw_usage=raw_usage,

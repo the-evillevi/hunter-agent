@@ -42,8 +42,8 @@ class CompletionResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     text: str
-    provider: str
-    model: str
+    provider: str = Field(min_length=1)
+    model: str = Field(min_length=1)
     duration_ms: int = Field(ge=0)
     finish_reason: Literal["stop", "length", "unknown"]
     raw_usage: dict[str, Any] = Field(default_factory=dict)
