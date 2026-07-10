@@ -15,7 +15,7 @@ guard works on bounded copies only.
 
 import re
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # Untrusted text is bounded for two reasons at once: embedded-instruction
@@ -33,6 +33,7 @@ SECTION_END = "<<<UNTRUSTED:{label}:END>>>"
 # breaks any occurrence apart so a listing cannot close its own section.
 DELIMITER_TOKEN = "<<<"
 NEUTRALIZED_DELIMITER = "<< <"
+SECTION_LABEL_PATTERN = r"^[a-z][a-z0-9_]{0,63}$"
 
 # Stable diagnostic codes with case-insensitive detection patterns.
 # Detection is intentionally coarse: these flag likely injection attempts
@@ -40,6 +41,7 @@ NEUTRALIZED_DELIMITER = "<< <"
 SUSPICION_PATTERNS: dict[str, re.Pattern[str]] = {
     "instruction_override": re.compile(
         r"(ignore|disregard|forget)\s+(all\s+|any\s+)?"
+        r"(the\s+)?"
         r"(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?)",
         re.IGNORECASE,
     ),
@@ -66,7 +68,7 @@ class SuspicionFlag(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     code: str
-    section_label: str
+    section_label: str = Field(pattern=SECTION_LABEL_PATTERN)
     excerpt: str
 
 
@@ -79,11 +81,19 @@ class GuardedSection(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    label: str = Field(min_length=1)
+    label: str = Field(pattern=SECTION_LABEL_PATTERN)
     text: str
     truncated: bool
     original_length: int = Field(ge=0)
     flags: tuple[SuspicionFlag, ...]
+
+    @field_validator("text")
+    @classmethod
+    def text_must_not_contain_marker_prefix(cls, text: str) -> str:
+        """Prevent manually constructed sections from bypassing neutralization."""
+        if DELIMITER_TOKEN in text:
+            raise ValueError("guarded section text contains a marker prefix")
+        return text
 
 
 class GuardedPayload(BaseModel):
@@ -131,6 +141,8 @@ def guard_untrusted_text(
     text a model could actually see.
     """
     original_length = len(text)
+    if isinstance(max_chars, bool) or not isinstance(max_chars, int) or max_chars <= 0:
+        raise ValueError("max_chars must be a positive integer")
     bounded = text[:max_chars]
 
     flags: list[SuspicionFlag] = []
@@ -145,10 +157,13 @@ def guard_untrusted_text(
                 )
             )
 
+    neutralized = _neutralize_delimiters(bounded)
+    guarded_copy = neutralized[:max_chars]
+
     return GuardedSection(
         label=label,
-        text=_neutralize_delimiters(bounded),
-        truncated=original_length > max_chars,
+        text=guarded_copy,
+        truncated=original_length > max_chars or len(neutralized) > max_chars,
         original_length=original_length,
         flags=tuple(flags),
     )
