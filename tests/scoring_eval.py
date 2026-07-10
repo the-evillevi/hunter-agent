@@ -35,7 +35,9 @@ class EvalProfile(BaseModel):
     role_name: str = Field(min_length=1)
     keywords: list[str] = Field(min_length=1)
     exclude_keywords: list[str] = Field(default_factory=list)
-    location_types: list[str] = Field(min_length=1)
+    # Typed with the real enum so a bad arrangement fails schema
+    # validation here, not deep inside a later eligibility test.
+    location_types: list[LocationType] = Field(min_length=1)
     salary_min: int = Field(default=0, ge=0)
 
     def to_profile_detail(self) -> ProfileDetail:
@@ -47,7 +49,7 @@ class EvalProfile(BaseModel):
                 match_threshold=80,
                 active=True,
             ),
-            location_types=tuple(LocationType(value) for value in self.location_types),
+            location_types=tuple(self.location_types),
             keywords=tuple(self.keywords),
             exclude_keywords=tuple(self.exclude_keywords),
             source_queries=(),

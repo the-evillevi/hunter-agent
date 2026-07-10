@@ -57,6 +57,8 @@ class EvalRow:
     semantic: str
     llm: str
     aggregate: int | None
+    pipeline_keyword: int | None
+    skip_reasons: tuple[str, ...]
 
     @property
     def aggregate_bucket(self) -> int:
@@ -75,13 +77,18 @@ class EvalRow:
 
 
 def ollama_base_url_if_reachable() -> str | None:
-    """One cheap probe decides whether model layers join this run."""
+    """One cheap probe decides whether model layers join this run.
+
+    Only a successful response counts: something else squatting on the
+    configured port (a proxy answering 404/502) must not trigger ~90
+    doomed model calls across the fixture.
+    """
     base_url = str(load_config().ollama.base_url)
     try:
-        httpx.get(base_url, timeout=OLLAMA_PROBE_TIMEOUT_SECONDS)
+        response = httpx.get(base_url, timeout=OLLAMA_PROBE_TIMEOUT_SECONDS)
     except httpx.HTTPError:
         return None
-    return base_url
+    return base_url if response.is_success else None
 
 
 def build_registry(base_url: str | None) -> ScoreLayerRegistry:
@@ -119,11 +126,19 @@ def evaluate_job(job: EvalJob, profile, registry: ScoreLayerRegistry) -> EvalRow
     result = asyncio.run(score_job(job_input, profile, registry=registry))
 
     layer_scores: dict[str, str] = {}
+    pipeline_keyword: int | None = None
+    skip_reasons: list[str] = []
     for outcome in result.layer_outcomes:
         if outcome.status == "success" and outcome.result is not None:
             layer_scores[outcome.layer] = str(outcome.result.score)
+            if outcome.layer == "keyword":
+                pipeline_keyword = outcome.result.score
         else:
             layer_scores[outcome.layer] = SKIPPED
+            # Keep the pipeline's own diagnosis; "SKIPPED" alone cannot
+            # explain a missing model or a timeout.
+            if outcome.failure_detail:
+                skip_reasons.append(f"{outcome.layer}: {outcome.failure_detail}")
 
     return EvalRow(
         job=job,
@@ -132,6 +147,8 @@ def evaluate_job(job: EvalJob, profile, registry: ScoreLayerRegistry) -> EvalRow
         semantic=layer_scores.get("semantic", SKIPPED),
         llm=layer_scores.get("llm", SKIPPED),
         aggregate=result.score,
+        pipeline_keyword=pipeline_keyword,
+        skip_reasons=tuple(skip_reasons),
     )
 
 
@@ -155,6 +172,14 @@ def print_table(rows: list[EvalRow], *, models_available: bool) -> None:
             f"{row.job.human_label:>5} {row.disagreement:>4}  {row.job.note}"
         )
 
+    # One deduplicated skip-reason block: why model columns are SKIPPED.
+    reasons = sorted({reason for row in rows for reason in row.skip_reasons})
+    if reasons:
+        print()
+        print("Layer skip reasons:")
+        for reason in reasons:
+            print(f"  - {reason}")
+
 
 def test_layer_comparison_over_labeled_fixture() -> None:
     fixture = load_fixture()
@@ -165,15 +190,14 @@ def test_layer_comparison_over_labeled_fixture() -> None:
     rows = [evaluate_job(job, profile, registry) for job in fixture.jobs]
     print_table(rows, models_available=base_url is not None)
 
-    # Deterministic layers must be identical across runs: re-run
-    # eligibility and keyword scoring and compare exactly.
+    # Falsifiable checks: the pipeline's keyword layer must agree with
+    # the directly-called scorer (this is the drift the harness can
+    # catch), and eligibility decisions must match the pipeline's
+    # rejected status for every job.
     for job, row in zip(fixture.jobs, rows):
-        again_eligibility = check_eligibility(
-            title=job.title,
-            description=job.description,
-            location=job.location,
-            profile=profile,
-        )
-        again_keyword = score_job_keywords(job.title, job.description, profile)
-        assert ("ok" if again_eligibility.eligible else "rejected") == row.eligibility
-        assert again_keyword.score == row.keyword
+        if row.eligibility == "rejected":
+            assert row.aggregate is None, f"{job.id}: rejected jobs have no score"
+        else:
+            assert row.pipeline_keyword == row.keyword, (
+                f"{job.id}: pipeline keyword layer disagrees with the direct scorer"
+            )

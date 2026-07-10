@@ -24,23 +24,11 @@
         </p>
         <p>
           Export:
-          <a
-            class="link"
-            href="/resumes/{{ application.resume_id }}/export?format=pdf"
-            >PDF</a
-          >
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=pdf">PDF</a>
           ·
-          <a
-            class="link"
-            href="/resumes/{{ application.resume_id }}/export?format=html"
-            >HTML</a
-          >
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=html">HTML</a>
           ·
-          <a
-            class="link"
-            href="/resumes/{{ application.resume_id }}/export?format=json"
-            >JSON</a
-          >
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=json">JSON</a>
         </p>
       {% elif application.cv_path is not none %}
         <p>{{ application.cv_path }}</p>
