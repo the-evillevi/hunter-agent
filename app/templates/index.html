@@ -63,4 +63,31 @@
       <div id="applications-list">{% include "_applications_list.html" %}</div>
     </div>
   </section>
+
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Recently tailored resumes</h2>
+        </div>
+
+        <div class="flex gap-2">
+          <a class="btn btn-ghost" href="/resumes">All resumes</a>
+          <button
+            type="button"
+            class="btn btn-primary"
+            hx-get="/resumes/partials/recent"
+            hx-target="#recent-tailor-runs"
+            hx-swap="innerHTML"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="recent-tailor-runs">{% include "_recent_tailor_runs.html" %}</div>
+    </div>
+  </section>
 {% endblock %}

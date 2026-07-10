@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">{{ detail.name }}</h2>
+          <p class="text-base-content/60 mt-1 text-sm">
+            Created {{ detail.created_at.strftime("%Y-%m-%d %H:%M") }}
+            {% if detail.base_resume_id %}
+              · tailored from
+              <a class="link" href="/resumes/{{ detail.base_resume_id }}">
+                resume #{{ detail.base_resume_id }}
+              </a>
+            {% endif %}
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2">
+          {% for export_format in export_formats %}
+            <a
+              class="btn btn-outline btn-sm"
+              href="/resumes/{{ detail.id }}/export?format={{ export_format }}"
+            >
+              {{ export_format.replace("_", " ") }}
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {% if not detail.base_resume_id %}
+    <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title text-base">Tailor for a job</h3>
+        <p class="text-base-content/60 text-sm">
+          Scores every fact against the job with the local model, drops weak
+          ones, and saves the result as a new variant. The master resume is
+          never modified.
+        </p>
+        <form
+          class="mt-2 flex flex-col gap-2 sm:flex-row"
+          hx-post="/resumes/{{ detail.id }}/tailor"
+          hx-target="#tailor-result"
+          hx-swap="innerHTML"
+        >
+          <select class="select select-bordered" name="job_id" required>
+            <option value="" disabled selected>Choose a job…</option>
+            {% for job in jobs %}
+              <option value="{{ job.id }}">
+                {{ job.title }} · {{ job.company }}
+              </option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-primary">Tailor resume</button>
+        </form>
+        <div id="tailor-result" class="mt-2"></div>
+      </div>
+    </section>
+  {% endif %}
+
+  {% for section in detail.sections %}
+    <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+      <div class="card-body">
+        <h3 class="card-title text-base">{{ section.title }}</h3>
+        <ul class="mt-2 flex flex-col gap-3">
+          {% for item in section.items %}
+            <li class="border-base-300 rounded border p-3">
+              {% if item.relevance_score is not none %}
+                <div class="mb-1 flex items-center gap-2">
+                  <span class="badge badge-info badge-sm">
+                    score {{ item.relevance_score | round | int }}
+                  </span>
+                  {% if item.score_is_fallback %}
+                    <span class="badge badge-warning badge-sm">
+                      fallback — model was unavailable
+                    </span>
+                  {% endif %}
+                </div>
+                {% if item.score_reasoning %}
+                  <p class="text-base-content/60 mb-1 text-xs italic">
+                    {{ item.score_reasoning }}
+                  </p>
+                {% endif %}
+              {% endif %}
+
+              <dl class="text-sm">
+                {% for key, value in item.content.items() if key != "source" %}
+                  <div class="flex gap-2">
+                    <dt class="text-base-content/60 min-w-24 font-medium">
+                      {{ key.replace("_", " ") }}
+                    </dt>
+                    <dd>
+                      {% if value is iterable and value is not string and value is not mapping %}
+                        <ul class="list-inside list-disc">
+                          {% for entry in value %}
+                            <li>{{ entry }}</li>
+                          {% endfor %}
+                        </ul>
+                      {% else %}
+                        {{ value }}
+                      {% endif %}
+                    </dd>
+                  </div>
+                {% endfor %}
+              </dl>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  {% endfor %}
+{% endblock %}

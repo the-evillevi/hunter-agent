@@ -6,11 +6,13 @@ Keeping database access here prevents HTML routes form becoming hard to read.
 
 from datetime import datetime
 
-from sqlmodel import Session, select
+from sqlalchemy import and_
+from sqlmodel import Session, func, select
 
 from app.models.application import Application, ApplicationListItem, ApplicationStatus
 from app.models.company import Company
 from app.models.job import Job
+from app.models.resume import ResumeProfile, ResumeTailorRun
 
 
 APPLICATION_STATUS_ORDER = [
@@ -81,6 +83,18 @@ def update_application_status(
 
 
 def _application_list_statement():
+    # Newest tailoring run per job, so each card can link the resume
+    # variant that was actually produced for its job (None if never
+    # tailored, or if that variant was soft-deleted).
+    latest_runs = (
+        select(
+            ResumeTailorRun.job_id.label("job_id"),
+            func.max(ResumeTailorRun.id).label("run_id"),
+        )
+        .group_by(ResumeTailorRun.job_id)
+        .subquery()
+    )
+
     return (
         select(
             Application.id,
@@ -91,9 +105,25 @@ def _application_list_statement():
             Application.applied_at,
             Application.last_updated,
             Application.notes,
+            ResumeProfile.id,
+            ResumeProfile.name,
         )
         .join(Job, Job.id == Application.job_id)
         .join(Company, Company.id == Job.company_id)
+        .join(latest_runs, latest_runs.c.job_id == Application.job_id, isouter=True)
+        .join(
+            ResumeTailorRun,
+            ResumeTailorRun.id == latest_runs.c.run_id,
+            isouter=True,
+        )
+        .join(
+            ResumeProfile,
+            and_(
+                ResumeProfile.id == ResumeTailorRun.output_profile_id,
+                ResumeProfile.deleted_at.is_(None),
+            ),
+            isouter=True,
+        )
     )
 
 
@@ -107,6 +137,8 @@ def _application_list_item_from_row(row) -> ApplicationListItem:
         applied_at,
         last_updated,
         notes,
+        resume_id,
+        resume_name,
     ) = row
     return ApplicationListItem(
         id=application_id,
@@ -117,4 +149,6 @@ def _application_list_item_from_row(row) -> ApplicationListItem:
         applied_at=applied_at,
         last_updated=last_updated,
         notes=notes,
+        resume_id=resume_id,
+        resume_name=resume_name,
     )

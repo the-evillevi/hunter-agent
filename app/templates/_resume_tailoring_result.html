@@ -1,0 +1,19 @@
+<div class="alert alert-success mt-2">
+  <div>
+    <p class="font-medium">
+      Created
+      <a class="link" href="/resumes/{{ variant.id }}">{{ variant.name }}</a>
+    </p>
+    <p class="text-sm">
+      {{ variant.sections | length }} sections and {{ kept_item_count }} items
+      survived the relevance filter.
+    </p>
+    {% if fallback_item_count %}
+      <p class="text-warning text-sm">
+        {{ fallback_item_count }} item(s) received a neutral fallback score
+        because the scoring model was unavailable — review them before
+        exporting.
+      </p>
+    {% endif %}
+  </div>
+</div>
