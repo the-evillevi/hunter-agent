@@ -16,6 +16,10 @@ class AIProviderError(Exception):
         self.model = model
 
 
+class AIConfigurationError(AIProviderError):
+    """The provider cannot start because required configuration is missing."""
+
+
 class AIConnectError(AIProviderError):
     """The provider could not be reached at all (service down, bad URL)."""
 
@@ -37,6 +41,14 @@ class AIHTTPError(AIProviderError):
     ) -> None:
         super().__init__(message, provider=provider, model=model)
         self.status_code = status_code
+
+
+class AIAuthenticationError(AIHTTPError):
+    """The provider rejected the configured credentials."""
+
+
+class AIRateLimitError(AIHTTPError):
+    """The provider rejected the request because its rate limit was exceeded."""
 
 
 class AIResponseError(AIProviderError):

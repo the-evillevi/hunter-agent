@@ -25,6 +25,10 @@ def test_load_config_returns_validated_model() -> None:
 
     assert isinstance(config, AppConfig)
     assert config.agent.name == "hunter-agent"
+    assert config.ai.generator.provider == "openai"
+    assert config.ai.generator.model == "gpt-5.5"
+    assert config.ai.critic.provider == "openai"
+    assert config.ai.critic.model == "gpt-5.5"
     assert "profiles" not in load_raw_config()
     assert not hasattr(config, "profiles")
 
@@ -64,6 +68,28 @@ def test_ollama_settings_are_validated(field: str, value: object) -> None:
     for part in parts[:-1]:
         target = target[part]
     target[parts[-1]] = value
+
+    with pytest.raises(ValidationError):
+        AppConfig.model_validate(raw_config)
+
+
+@pytest.mark.parametrize(
+    ("role", "field", "value"),
+    [
+        ("generator", "provider", "other"),
+        ("critic", "model", " "),
+        ("generator", "temperature", -0.1),
+        ("critic", "temperature", 1.1),
+        ("generator", "max_tokens", 0),
+    ],
+)
+def test_cloud_role_settings_are_validated(
+    role: str,
+    field: str,
+    value: object,
+) -> None:
+    raw_config = deepcopy(load_raw_config())
+    raw_config["ai"][role][field] = value
 
     with pytest.raises(ValidationError):
         AppConfig.model_validate(raw_config)

@@ -103,6 +103,31 @@ class OllamaConfig(StrictConfigModel):
     tailor: OllamaModelConfig
 
 
+class CloudModelConfig(StrictConfigModel):
+    """One cloud completion provider/model assignment."""
+
+    provider: Literal["openai"]
+    model: str = Field(min_length=1)
+    temperature: float = Field(ge=0, le=1)
+    max_tokens: int = Field(gt=0)
+
+    @field_validator("model")
+    @classmethod
+    def model_must_not_be_blank(cls, model: str) -> str:
+        """Normalize model identities used for audit metadata and requests."""
+        model = model.strip()
+        if not model:
+            raise ValueError("cloud model name cannot be blank")
+        return model
+
+
+class CloudAIConfig(StrictConfigModel):
+    """Independent OpenAI model assignments for CV tailoring roles."""
+
+    generator: CloudModelConfig
+    critic: CloudModelConfig
+
+
 class AdzunaSourceConfig(StrictConfigModel):
     """Adzuna source settings."""
 
@@ -231,6 +256,7 @@ class AppConfig(StrictConfigModel):
     agent: AgentConfig
     scheduler: SchedulerConfig
     ollama: OllamaConfig
+    ai: CloudAIConfig
     sources: SourcesConfig
     application: ApplicationConfig
 
