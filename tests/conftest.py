@@ -23,7 +23,8 @@ from app.models.job import Job
 from app.models.location import Location
 from app.models.profile import LocationType, Profile
 
-# Register score-history tables before each isolated schema is created.
+# Register audit-history tables before each isolated schema is created.
+from app.models.pipeline_run import PipelineRun  # noqa: F401
 from app.models.score_run import ScoreLayerResultRow, ScoreRun  # noqa: F401
 from app.models.source import Source
 from app.services.profiles import ProfileDetail
