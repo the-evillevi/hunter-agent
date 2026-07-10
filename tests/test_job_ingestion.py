@@ -8,6 +8,7 @@ per-test SQLite database.
 from collections.abc import Callable
 
 import pytest
+from sqlalchemy import event
 from sqlmodel import Session, select
 
 from app.models.company import Company
@@ -210,6 +211,48 @@ def test_unknown_companies_and_locations_are_created(
     location = session.exec(select(Location)).one()
     assert company.name == "Initech"  # stored stripped, original casing kept
     assert location.name == "Austin, TX"
+
+
+def test_lookup_tables_are_loaded_once_per_batch(
+    session, remotive_source, make_record
+) -> None:
+    select_counts = {"companies": 0, "locations": 0}
+    engine = session.get_bind()
+
+    def count_lookup_selects(
+        connection,
+        cursor,
+        statement: str,
+        parameters,
+        context,
+        executemany: bool,
+    ) -> None:
+        normalized_statement = " ".join(statement.casefold().split())
+        for table_name in select_counts:
+            if normalized_statement.startswith("select") and (
+                f" from {table_name}" in normalized_statement
+            ):
+                select_counts[table_name] += 1
+
+    event.listen(engine, "before_cursor_execute", count_lookup_selects)
+    try:
+        summary = ingest_normalized_jobs(
+            session,
+            [
+                make_record(
+                    title=f"Engineer {index}",
+                    company=f"Company {index}",
+                    location=f"Location {index}",
+                    url=f"https://example.test/jobs/{index}",
+                )
+                for index in range(3)
+            ],
+        )
+    finally:
+        event.remove(engine, "before_cursor_execute", count_lookup_selects)
+
+    assert summary.inserted_count == 3
+    assert select_counts == {"companies": 1, "locations": 1}
 
 
 def test_blank_urls_are_stored_as_null_and_do_not_collide(

@@ -165,22 +165,19 @@ class _LookupResolver:
         self._session = session
         self._cache: dict[tuple[type, str], Company | Location] = {}
         self._pending: dict[tuple[type, str], Company | Location] = {}
+        self._loaded_models: set[type] = set()
 
     def get_or_create(
         self,
         model: type[Company] | type[Location],
         name: str,
     ) -> Company | Location:
+        self._load_existing_rows(model)
         key = (model, normalize_name(name))
         if key in self._cache:
             return self._cache[key]
         if key in self._pending:
             return self._pending[key]
-
-        row = _find_named_row(self._session, model, name)
-        if row is not None:
-            self._cache[key] = row
-            return row
 
         row = model(name=name.strip())
         self._session.add(row)
@@ -196,22 +193,17 @@ class _LookupResolver:
     def discard_pending(self) -> None:
         self._pending.clear()
 
-
-def _find_named_row(
-    session: Session,
-    model: type[Company] | type[Location],
-    name: str,
-) -> Company | Location | None:
-    """Match by whitespace-collapsed, casefolded name.
-
-    Same rule as ``find_company_by_normalized_name`` in the S&P 500 import,
-    generalized so companies and locations resolve identically.
-    """
-    normalized = normalize_name(name)
-    for row in session.exec(select(model)).all():
-        if normalize_name(row.name) == normalized:
-            return row
-    return None
+    def _load_existing_rows(
+        self,
+        model: type[Company] | type[Location],
+    ) -> None:
+        """Load each lookup table once and index it by normalized name."""
+        if model in self._loaded_models:
+            return
+        for row in self._session.exec(select(model)).all():
+            key = (model, normalize_name(row.name))
+            self._cache.setdefault(key, row)
+        self._loaded_models.add(model)
 
 
 def _validation_failure_reason(session: Session, record: NormalizedJob) -> str | None:
