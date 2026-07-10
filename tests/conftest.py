@@ -18,6 +18,7 @@ from sqlmodel import SQLModel, Session, create_engine, select
 from app.db.database import get_session
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.blacklist import Blacklist  # noqa: F401
 from app.models.company import Company
 from app.models.job import Job
 from app.models.location import Location
