@@ -15,8 +15,10 @@ from datetime import datetime
 from sqlalchemy import distinct
 from sqlmodel import Session, func, select
 
+from app.models.job import Job
 from app.models.resume import (
     ExportFormat,
+    RecentTailorRun,
     ResumeDetail,
     ResumeExportProfile,
     ResumeItem,
@@ -25,6 +27,7 @@ from app.models.resume import (
     ResumeProfile,
     ResumeSection,
     ResumeSectionDetail,
+    ResumeTailorRun,
     SectionType,
 )
 
@@ -195,6 +198,132 @@ def add_item(
     session.add(item)
     session.flush()
     return item
+
+
+def update_resume_profile(
+    session: Session,
+    *,
+    profile_id: int,
+    name: str,
+) -> ResumeProfile:
+    """Rename a profile and bump its updated_at timestamp."""
+    profile = session.get(ResumeProfile, profile_id)
+    if profile is None or profile.deleted_at is not None:
+        raise LookupError(f"Resume profile {profile_id} was not found")
+
+    profile.name = name
+    profile.updated_at = datetime.now()
+    session.add(profile)
+    session.commit()
+    session.refresh(profile)
+    return profile
+
+
+def update_item_content(
+    session: Session,
+    *,
+    profile_id: int,
+    item_id: int,
+    content: dict | None = None,
+    order_idx: int | None = None,
+) -> ResumeItem:
+    """Edit one item's fact payload and/or position within its section.
+
+    The item must belong to ``profile_id`` so a PATCH on one resume can
+    never silently edit another resume's facts.
+    """
+    item = session.get(ResumeItem, item_id)
+    section = None if item is None else session.get(ResumeSection, item.section_id)
+    if section is None or section.profile_id != profile_id:
+        raise LookupError(
+            f"Resume item {item_id} was not found in profile {profile_id}"
+        )
+
+    if content is not None:
+        item.content = json.dumps(content, ensure_ascii=False)
+    if order_idx is not None:
+        item.order_idx = order_idx
+    session.add(item)
+
+    profile = session.get(ResumeProfile, profile_id)
+    profile.updated_at = datetime.now()
+    session.add(profile)
+
+    session.commit()
+    session.refresh(item)
+    return item
+
+
+def update_section_order(
+    session: Session,
+    *,
+    profile_id: int,
+    section_id: int,
+    order_idx: int,
+) -> ResumeSection:
+    """Move one section within its profile."""
+    section = session.get(ResumeSection, section_id)
+    if section is None or section.profile_id != profile_id:
+        raise LookupError(
+            f"Resume section {section_id} was not found in profile {profile_id}"
+        )
+
+    section.order_idx = order_idx
+    session.add(section)
+
+    profile = session.get(ResumeProfile, profile_id)
+    profile.updated_at = datetime.now()
+    session.add(profile)
+
+    session.commit()
+    session.refresh(section)
+    return section
+
+
+def list_recent_tailor_runs(
+    session: Session, limit: int = 5
+) -> list[RecentTailorRun]:
+    """Return the newest tailoring runs for the dashboard card."""
+    statement = (
+        select(
+            ResumeTailorRun.id,
+            ResumeProfile.id,
+            ResumeProfile.name,
+            Job.id,
+            Job.title,
+            ResumeTailorRun.model,
+            ResumeTailorRun.duration_ms,
+            ResumeTailorRun.created_at,
+        )
+        .join(ResumeProfile, ResumeProfile.id == ResumeTailorRun.output_profile_id)
+        .join(Job, Job.id == ResumeTailorRun.job_id)
+        .where(ResumeProfile.deleted_at.is_(None))
+        .order_by(ResumeTailorRun.created_at.desc(), ResumeTailorRun.id.desc())
+        .limit(limit)
+    )
+
+    return [
+        RecentTailorRun(
+            run_id=run_id,
+            resume_id=resume_id,
+            resume_name=resume_name,
+            job_id=job_id,
+            job_title=job_title or "Untitled job",
+            model=model,
+            duration_ms=duration_ms,
+            created_at=created_at,
+        )
+        for (
+            run_id,
+            resume_id,
+            resume_name,
+            job_id,
+            job_title,
+            model,
+            duration_ms,
+            created_at,
+        ) in session.exec(statement).all()
+    ]
 
 
 def soft_delete_profile(session: Session, *, profile_id: int) -> ResumeProfile:

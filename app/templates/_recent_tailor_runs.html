@@ -1,0 +1,36 @@
+{% if recent_tailor_runs %}
+  <div class="overflow-x-auto">
+    <table class="table-zebra table">
+      <thead>
+        <tr>
+          <th>Resume</th>
+          <th>Job</th>
+          <th>Model</th>
+          <th>Duration</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in recent_tailor_runs %}
+          <tr>
+            <td>
+              <a class="link font-semibold" href="/resumes/{{ run.resume_id }}">
+                {{ run.resume_name }}
+              </a>
+            </td>
+            <td>{{ run.job_title }}</td>
+            <td>{{ run.model }}</td>
+            <td>{{ run.duration_ms }} ms</td>
+            <td>{{ run.created_at }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-base-content/60 text-sm">
+    No tailoring runs yet. Tailor a resume from the
+    <a class="link" href="/jobs">jobs list</a> or a
+    <a class="link" href="/resumes">resume page</a>.
+  </p>
+{% endif %}

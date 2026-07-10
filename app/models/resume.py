@@ -225,6 +225,19 @@ class ResumeExportProfile(SQLModel, table=True):
         return [SectionType(name) for name in json.loads(self.section_filters)]
 
 
+class RecentTailorRun(SQLModel):
+    """Display shape for one row in the dashboard's recent-tailoring card."""
+
+    run_id: int
+    resume_id: int
+    resume_name: str
+    job_id: int
+    job_title: str
+    model: str
+    duration_ms: int
+    created_at: datetime
+
+
 class ResumeListItem(SQLModel):
     """Display shape for one resume row in the HTMX list template."""
 
