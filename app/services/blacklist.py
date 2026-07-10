@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from app.models.blacklist import Blacklist
@@ -159,8 +160,22 @@ def _company_entry(session: Session, company_id: int) -> Blacklist | None:
 
 
 def _insert_entry(session: Session, entry: Blacklist) -> Blacklist:
+    job_id = entry.job_id
+    company_id = entry.company_id
     session.add(entry)
-    session.commit()
+    try:
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        if job_id is not None and _job_entry(session, job_id) is not None:
+            raise DuplicateBlacklistEntryError(
+                f"job {job_id} is already blacklisted"
+            ) from error
+        if company_id is not None and _company_entry(session, company_id) is not None:
+            raise DuplicateBlacklistEntryError(
+                f"company {company_id} is already blacklisted"
+            ) from error
+        raise
     session.refresh(entry)
     return entry
 

@@ -8,7 +8,7 @@ personal blacklist, not an audit trail (decided on HNTR-52).
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint
+from sqlalchemy import CheckConstraint, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -22,6 +22,8 @@ class Blacklist(SQLModel, table=True):
             " OR (company_id IS NULL AND job_id IS NOT NULL)",
             name="ck_blacklist_exactly_one_target",
         ),
+        UniqueConstraint("company_id", name="uq_blacklist_company_id"),
+        UniqueConstraint("job_id", name="uq_blacklist_job_id"),
     )
 
     id: int | None = Field(default=None, primary_key=True)

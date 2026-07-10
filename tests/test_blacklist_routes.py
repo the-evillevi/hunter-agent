@@ -1,5 +1,6 @@
 """Route tests for the blacklist HTMX endpoints (HNTR-52)."""
 
+import app.services.blacklist as blacklist_service
 from app.main import app
 from app.services.blacklist import add_company_to_blacklist, add_job_to_blacklist
 
@@ -20,10 +21,19 @@ def test_blacklist_unknown_job_is_404(client) -> None:
 
 
 def test_duplicate_job_blacklist_is_409_with_row_fragment(
-    client, session, create_job
+    client, session, create_job, monkeypatch
 ) -> None:
     job = create_job()
     add_job_to_blacklist(session, job_id=job.id)
+    original_lookup = blacklist_service._job_entry
+    calls = 0
+
+    def miss_precheck_once(session_, job_id):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else original_lookup(session_, job_id)
+
+    monkeypatch.setattr(blacklist_service, "_job_entry", miss_precheck_once)
 
     response = client.post(f"/jobs/{job.id}/blacklist")
 

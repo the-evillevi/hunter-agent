@@ -252,6 +252,8 @@ CREATE TABLE blacklist (
   job_id INTEGER REFERENCES jobs (id),
   reason TEXT,
   added_at DATETIME NOT NULL,
+  UNIQUE (company_id),
+  UNIQUE (job_id),
   CHECK (
     (
       company_id IS NOT NULL

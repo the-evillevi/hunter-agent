@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
+import app.services.blacklist as blacklist_service
 from app.models.blacklist import Blacklist
 from app.services.blacklist import (
     BlacklistTargetNotFoundError,
@@ -58,6 +59,37 @@ def test_duplicate_job_entry_raises(session, create_job) -> None:
 
     with pytest.raises(DuplicateBlacklistEntryError):
         add_job_to_blacklist(session, job_id=job.id)
+
+
+def test_database_rejects_duplicate_targets(session, create_job) -> None:
+    job = create_job()
+    add_job_to_blacklist(session, job_id=job.id)
+
+    with pytest.raises(IntegrityError):
+        session.add(Blacklist(job_id=job.id))
+        session.commit()
+    session.rollback()
+
+
+def test_insert_time_duplicate_is_translated_and_session_recovers(
+    session, create_job, monkeypatch
+) -> None:
+    job = create_job()
+    add_job_to_blacklist(session, job_id=job.id)
+    original_lookup = blacklist_service._job_entry
+    calls = 0
+
+    def miss_precheck_once(session_, job_id):
+        nonlocal calls
+        calls += 1
+        return None if calls == 1 else original_lookup(session_, job_id)
+
+    monkeypatch.setattr(blacklist_service, "_job_entry", miss_precheck_once)
+
+    with pytest.raises(DuplicateBlacklistEntryError, match="already blacklisted"):
+        add_job_to_blacklist(session, job_id=job.id)
+
+    assert original_lookup(session, job.id) is not None
 
 
 def test_unknown_targets_raise(session) -> None:
