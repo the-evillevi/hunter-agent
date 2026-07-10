@@ -211,9 +211,7 @@ def _hundred_item_detail(detail):
     return inflated
 
 
-def test_to_pdf_handles_hundred_plus_items_within_size_limit(
-    compiler, detail
-) -> None:
+def test_to_pdf_handles_hundred_plus_items_within_size_limit(compiler, detail) -> None:
     inflated = _hundred_item_detail(detail)
 
     try:

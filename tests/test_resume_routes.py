@@ -212,9 +212,7 @@ def test_create_resume_rejects_invalid_document(client) -> None:
 
 
 def test_patch_resume_renames_profile(client, imported_resume_id) -> None:
-    response = client.patch(
-        f"/resumes/{imported_resume_id}", json={"name": "renamed"}
-    )
+    response = client.patch(f"/resumes/{imported_resume_id}", json={"name": "renamed"})
 
     assert response.status_code == 200
     assert response.json()["name"] == "renamed"

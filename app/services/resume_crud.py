@@ -280,9 +280,7 @@ def update_section_order(
     return section
 
 
-def list_recent_tailor_runs(
-    session: Session, limit: int = 5
-) -> list[RecentTailorRun]:
+def list_recent_tailor_runs(session: Session, limit: int = 5) -> list[RecentTailorRun]:
     """Return the newest tailoring runs for the dashboard card."""
     statement = (
         select(

@@ -6,6 +6,8 @@ BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS resume_export_profiles;
 
+DROP TABLE IF EXISTS resume_tailor_run_items;
+
 DROP TABLE IF EXISTS resume_tailor_runs;
 
 DROP TABLE IF EXISTS resume_items;
