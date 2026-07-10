@@ -5,27 +5,33 @@ is the core promise of this layer — identical inputs always produce the
 same bounded score and explanation.
 """
 
-from app.models.config import ProfileConfig
+from dataclasses import dataclass
+
+from app.models.profile import Profile
 from app.services.keyword_scoring import (
     DESCRIPTION_WEIGHT,
     TITLE_WEIGHT,
     score_job_keywords,
 )
+from app.services.profiles import ProfileDetail
+
+
+@dataclass(frozen=True)
+class ProfileView:
+    """Minimal database-independent view of the persisted profile aggregate."""
+
+    keywords: tuple[str, ...]
+    exclude_keywords: tuple[str, ...]
 
 
 def make_profile(
     keywords: list[str],
     exclude_keywords: list[str] | None = None,
-) -> ProfileConfig:
+) -> ProfileView:
     """Build a minimal valid profile for scoring tests."""
-    return ProfileConfig(
-        role_name="Test Role",
-        active=True,
-        match_threshold=80,
-        salary_min=0,
-        location_type="remote",
-        keywords=keywords,
-        exclude_keywords=exclude_keywords or [],
+    return ProfileView(
+        keywords=tuple(keywords),
+        exclude_keywords=tuple(exclude_keywords or []),
     )
 
 
@@ -48,6 +54,20 @@ def test_identical_inputs_return_identical_results() -> None:
     second = score_job_keywords(title, description, profile)
 
     assert first == second
+
+
+def test_database_profile_detail_can_be_scored_without_a_session() -> None:
+    profile = ProfileDetail(
+        profile=Profile(role_name="Backend Engineer"),
+        location_types=(),
+        keywords=("Python",),
+        exclude_keywords=(),
+        source_queries=(),
+    )
+
+    result = score_job_keywords("Python Developer", None, profile)
+
+    assert result.score == 100
 
 
 def test_multi_word_phrase_matches_across_punctuation() -> None:

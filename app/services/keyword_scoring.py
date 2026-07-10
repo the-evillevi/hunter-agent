@@ -8,8 +8,8 @@ HNTR-49; this layer only reports excluded terms it happens to see.
 """
 
 import re
+from typing import Protocol
 
-from app.models.config import ProfileConfig
 from app.models.scoring import KeywordScoreResult
 
 
@@ -32,6 +32,20 @@ TOKEN_RE = re.compile(r"[a-z0-9+#]+")
 # Collapsed n-grams let hyphen/space variants match each other:
 # "full-stack" tokenizes to ["full", "stack"] and collapses to "fullstack".
 MAX_COLLAPSED_NGRAM = 3
+
+
+class KeywordProfile(Protocol):
+    """Structural profile view needed by deterministic keyword scoring.
+
+    Database-backed ``ProfileDetail`` objects satisfy this protocol without
+    coupling the scoring layer to profile persistence or a SQLModel session.
+    """
+
+    @property
+    def keywords(self) -> tuple[str, ...]: ...
+
+    @property
+    def exclude_keywords(self) -> tuple[str, ...]: ...
 
 
 def tokenize(text: str | None) -> list[str]:
@@ -83,7 +97,7 @@ class FieldIndex:
 def score_job_keywords(
     title: str | None,
     description: str | None,
-    profile: ProfileConfig,
+    profile: KeywordProfile,
 ) -> KeywordScoreResult:
     """Score job text against one profile's keywords, deterministically.
 
