@@ -20,9 +20,10 @@ from app.services.sp500_ingestion import Sp500IngestionSummary
 PUBLIC_PATHS = {
     "/health",
     "/api/companies/sp500/ingest",
+    "/api/pipeline/run",
 }
 
-APPROVED_TAGS = {"Monitoring", "Ingestion"}
+APPROVED_TAGS = {"Monitoring", "Ingestion", "Pipeline"}
 
 
 def openapi_document() -> dict:
@@ -56,6 +57,8 @@ def test_html_and_htmx_routes_are_excluded() -> None:
         "/applications/{application_id}",
         "/sources/{source_id}/toggle",
         "/companies/sp500/ingest",
+        "/pipeline/run",
+        "/pipeline/partials/runs",
     ):
         assert expected_ui_path in ui_paths
     assert documented_paths.isdisjoint(ui_paths)

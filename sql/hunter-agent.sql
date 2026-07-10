@@ -26,6 +26,8 @@ DROP TABLE IF EXISTS profile_location_types;
 
 DROP TABLE IF EXISTS profile_keywords;
 
+DROP TABLE IF EXISTS pipeline_runs;
+
 DROP TABLE IF EXISTS score_layer_results;
 
 DROP TABLE IF EXISTS score_runs;
@@ -219,6 +221,36 @@ CREATE TABLE score_layer_results (
 );
 
 CREATE INDEX idx_score_layer_results_run ON score_layer_results (score_run_id);
+
+-- Append-only pipeline audit (HNTR-51). Exactly one row per pipeline run —
+-- manual or scheduled — with headline counts and bounded error text.
+-- Per-job scoring detail already lives in score_runs; stage diagnostics
+-- belong in logs.
+CREATE TABLE pipeline_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trigger_type TEXT NOT NULL CHECK (trigger_type IN ('manual', 'scheduled')),
+  status TEXT NOT NULL CHECK (
+    status IN (
+      'success',
+      'partial',
+      'failure',
+      'skipped_overlap',
+      'skipped_misfire'
+    )
+  ),
+  started_at DATETIME NOT NULL,
+  finished_at DATETIME,
+  discovered_count INTEGER NOT NULL DEFAULT 0 CHECK (discovered_count >= 0),
+  persisted_count INTEGER NOT NULL DEFAULT 0 CHECK (persisted_count >= 0),
+  duplicates_count INTEGER NOT NULL DEFAULT 0 CHECK (duplicates_count >= 0),
+  rejected_count INTEGER NOT NULL DEFAULT 0 CHECK (rejected_count >= 0),
+  scored_count INTEGER NOT NULL DEFAULT 0 CHECK (scored_count >= 0),
+  failed_count INTEGER NOT NULL DEFAULT 0 CHECK (failed_count >= 0),
+  errors TEXT CHECK (errors IS NULL OR json_valid(errors)), -- JSON array of {stage, message}
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_pipeline_runs_started_at ON pipeline_runs (started_at);
 
 CREATE TABLE applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
