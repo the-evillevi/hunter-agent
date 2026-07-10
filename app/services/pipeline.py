@@ -15,6 +15,7 @@ scoring for jobs that were already persisted.
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import json
 import os
 from collections.abc import Awaitable, Callable, Sequence
@@ -256,7 +257,7 @@ async def run_job_pipeline(
         summary.add_error("run", str(error))
     finally:
         if lock_descriptor is not None and resolved_lock is not None:
-            _release_lock(resolved_lock, lock_descriptor)
+            _release_lock(lock_descriptor)
 
     summary.finish(resolved_now())
     return _persist_run(session, summary), summary
@@ -290,6 +291,7 @@ async def _run_stages(
         try:
             contexts = stages.list_run_contexts(session, source_name)
         except Exception as error:  # noqa: BLE001 - keep other sources running
+            session.rollback()
             summary.add_error("selection", f"{source_name}: {error}")
             continue
         for context in contexts:
@@ -298,6 +300,7 @@ async def _run_stages(
                     await stages.fetch_jobs(session, source_name, context)
                 )
             except Exception as error:  # noqa: BLE001 - keep other sources running
+                session.rollback()
                 summary.add_error("fetch", f"{source_name}: {error}")
     summary.discovered = len(discovered)
 
@@ -318,6 +321,7 @@ async def _run_stages(
         try:
             status = await stages.score_persisted_job(session, job_id, scoring_registry)
         except Exception as error:  # noqa: BLE001 - keep scoring later jobs
+            session.rollback()
             summary.failed += 1
             summary.add_error("scoring", f"job {job_id}: {error}")
             continue
@@ -391,59 +395,28 @@ async def _score_persisted_job(
 
 
 def _acquire_lock(lock_path: Path) -> int | None:
-    """Create the lock file exclusively; ``None`` means another run owns it.
+    """Take a kernel-backed nonblocking lock on the configured file.
 
-    The file records the owning PID so a lock left behind by a crashed
-    process (kill -9, power loss) can be reclaimed instead of disabling
-    every future run until someone deletes the file by hand.
+    ``flock`` is released automatically when a process exits, so an abandoned
+    file is harmless and stale-lock reclamation cannot race a new owner.
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = _try_create_lock(lock_path)
-    if descriptor is None and not _lock_owner_is_alive(lock_path):
-        lock_path.unlink(missing_ok=True)
-        descriptor = _try_create_lock(lock_path)
-    if descriptor is None:
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(descriptor)
         return None
-    os.write(descriptor, str(os.getpid()).encode())
+    except Exception:
+        os.close(descriptor)
+        raise
     return descriptor
 
 
-def _try_create_lock(lock_path: Path) -> int | None:
-    try:
-        return os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return None
-
-
-def _lock_owner_is_alive(lock_path: Path) -> bool:
-    """Best-effort staleness check; anything unreadable counts as alive."""
-    try:
-        pid = int(lock_path.read_text().strip())
-    except OSError, ValueError:
-        return True
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    return True
-
-
-def _release_lock(lock_path: Path, descriptor: int) -> None:
-    """Close and remove the lock file so the next run can start.
-
-    Only the recorded owner removes the file: if this run's stale lock was
-    already reclaimed by a newer run, deleting blindly would free a lock
-    that run still holds.
-    """
+def _release_lock(descriptor: int) -> None:
+    """Release the advisory lock; keep the inode for race-free reuse."""
+    fcntl.flock(descriptor, fcntl.LOCK_UN)
     os.close(descriptor)
-    try:
-        owner = lock_path.read_text().strip()
-    except OSError:
-        return
-    if owner == str(os.getpid()):
-        lock_path.unlink(missing_ok=True)
 
 
 def _persist_run(session: Session, summary: PipelineRunSummary) -> PipelineRun:

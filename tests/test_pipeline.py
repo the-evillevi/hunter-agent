@@ -7,12 +7,14 @@ correct status derivation, and bounded error text.
 """
 
 import asyncio
+import fcntl
 import json
+import os
 import subprocess
 from dataclasses import replace
+from datetime import datetime
 from pathlib import Path
 
-import pytest
 from sqlmodel import Session, select
 
 from app.models.pipeline_run import PipelineRun
@@ -191,11 +193,16 @@ def test_held_lock_records_one_skipped_overlap_row_without_stage_work(
     session, tmp_path
 ) -> None:
     lock_path = tmp_path / "pipeline.lock"
-    lock_path.write_text("held by another run")
+    held_descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(held_descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
     calls: list[str] = []
     stages = make_stages(calls=calls)
 
-    run, summary = run_pipeline(session, tmp_path, stages, lock_path=lock_path)
+    try:
+        run, summary = run_pipeline(session, tmp_path, stages, lock_path=lock_path)
+    finally:
+        fcntl.flock(held_descriptor, fcntl.LOCK_UN)
+        os.close(held_descriptor)
 
     assert summary.status == "skipped_overlap"
     assert calls == []
@@ -206,9 +213,9 @@ def test_held_lock_records_one_skipped_overlap_row_without_stage_work(
     assert lock_path.exists()
 
 
-def test_stale_lock_from_dead_process_is_reclaimed(session, tmp_path) -> None:
+def test_abandoned_lock_file_is_reused(session, tmp_path) -> None:
     lock_path = tmp_path / "pipeline.lock"
-    # A finished child process gives us a PID that no longer exists.
+    # A finished process leaves only file contents; its kernel lock is gone.
     dead = subprocess.Popen(["true"])
     dead.wait()
     lock_path.write_text(str(dead.pid))
@@ -216,7 +223,7 @@ def test_stale_lock_from_dead_process_is_reclaimed(session, tmp_path) -> None:
     run, summary = run_pipeline(session, tmp_path, make_stages(), lock_path=lock_path)
 
     assert summary.status == "success"
-    assert not lock_path.exists()
+    assert lock_path.exists()
 
 
 def test_failed_score_results_never_report_success(session, tmp_path) -> None:
@@ -243,9 +250,37 @@ def test_lock_is_released_after_a_run(session, tmp_path) -> None:
 
     run_pipeline(session, tmp_path, stages, lock_path=lock_path)
 
-    assert not lock_path.exists()
+    assert lock_path.exists()
     run, summary = run_pipeline(session, tmp_path, stages, lock_path=lock_path)
     assert summary.status != "skipped_overlap"
+
+
+def test_scoring_database_failure_rolls_back_and_audit_row_survives(
+    session, tmp_path
+) -> None:
+    ingestion = JobIngestionSummary(inserted_job_ids=[61, 62])
+    stages = make_stages(fetched=["a"], ingestion=ingestion)
+
+    async def score_with_failed_transaction(session_, job_id, registry) -> str:
+        if job_id == 61:
+            session_.add(
+                PipelineRun(
+                    trigger_type="invalid",
+                    status="success",
+                    started_at=datetime.now(),
+                )
+            )
+            session_.flush()
+        return "scored"
+
+    stages = replace(stages, score_persisted_job=score_with_failed_transaction)
+
+    run, summary = run_pipeline(session, tmp_path, stages)
+
+    assert summary.status == "partial"
+    assert (summary.scored, summary.failed) == (1, 1)
+    assert run.id is not None
+    assert len(all_runs(session)) == 1
 
 
 def test_no_enabled_sources_is_a_visible_failure(session, tmp_path) -> None:
