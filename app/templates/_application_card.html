@@ -15,7 +15,22 @@
     </div>
 
     <div class="text-base-content/70 text-sm lg:text-right">
-      {% if application.cv_path is not none %}
+      {% if application.resume_id is not none %}
+        <p>
+          Resume:
+          <a class="link" href="/resumes/{{ application.resume_id }}">
+            {{ application.resume_name }}
+          </a>
+        </p>
+        <p>
+          Export:
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=pdf">PDF</a>
+          ·
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=html">HTML</a>
+          ·
+          <a class="link" href="/resumes/{{ application.resume_id }}/export?format=json">JSON</a>
+        </p>
+      {% elif application.cv_path is not none %}
         <p>{{ application.cv_path }}</p>
       {% endif %}
 

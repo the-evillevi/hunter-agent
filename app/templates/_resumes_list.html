@@ -1,0 +1,45 @@
+{% if resumes %}
+  <div class="mt-4 overflow-x-auto">
+    <table class="table-zebra table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Kind</th>
+          <th class="text-right">Sections</th>
+          <th class="text-right">Items</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for resume in resumes %}
+          <tr>
+            <td class="font-medium">{{ resume.name }}</td>
+            <td>
+              {% if resume.base_resume_id %}
+                <span class="badge badge-secondary badge-sm">
+                  variant of #{{ resume.base_resume_id }}
+                </span>
+              {% else %}
+                <span class="badge badge-primary badge-sm">master</span>
+              {% endif %}
+            </td>
+            <td class="text-right">{{ resume.section_count }}</td>
+            <td class="text-right">{{ resume.item_count }}</td>
+            <td>{{ resume.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="text-right">
+              <a class="btn btn-ghost btn-xs" href="/resumes/{{ resume.id }}">
+                View
+              </a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-base-content/60 mt-4 text-sm">
+    No resumes yet. Import the master resume with
+    <code>uv run python -m app.services.resume_import</code>.
+  </p>
+{% endif %}
