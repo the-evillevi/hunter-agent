@@ -11,6 +11,7 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.services.jobs import list_jobs
+from app.services.resume_crud import list_resumes
 from app.services.sources import list_sources
 
 
@@ -18,7 +19,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-@router.get("/jobs", response_class=HTMLResponse)
+def _base_resumes(session: Session):
+    """Master resumes only: tailoring a tailored variant compounds filtering."""
+    return [resume for resume in list_resumes(session) if resume.base_resume_id is None]
+
+
+@router.get("/jobs", response_class=HTMLResponse, include_in_schema=False)
 def jobs_page(
     request: Request,
     session: Session = Depends(get_session),
@@ -27,7 +33,11 @@ def jobs_page(
     return templates.TemplateResponse(
         request,
         "jobs.html",
-        {"jobs": list_jobs(session), "sources": list_sources(session)},
+        {
+            "jobs": list_jobs(session),
+            "sources": list_sources(session),
+            "base_resumes": _base_resumes(session),
+        },
     )
 
 
@@ -49,5 +59,5 @@ def jobs_list_partial(
     return templates.TemplateResponse(
         request,
         "_jobs_list.html",
-        {"jobs": jobs},
+        {"jobs": jobs, "base_resumes": _base_resumes(session)},
     )

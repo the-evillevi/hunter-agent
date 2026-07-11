@@ -6,6 +6,8 @@ BEGIN TRANSACTION;
 
 DROP TABLE IF EXISTS resume_export_profiles;
 
+DROP TABLE IF EXISTS resume_tailor_run_items;
+
 DROP TABLE IF EXISTS resume_tailor_runs;
 
 DROP TABLE IF EXISTS resume_items;
@@ -23,6 +25,10 @@ DROP TABLE IF EXISTS profile_source_queries;
 DROP TABLE IF EXISTS profile_location_types;
 
 DROP TABLE IF EXISTS profile_keywords;
+
+DROP TABLE IF EXISTS score_layer_results;
+
+DROP TABLE IF EXISTS score_runs;
 
 DROP TABLE IF EXISTS jobs;
 
@@ -164,9 +170,55 @@ CREATE TABLE jobs (
   description TEXT,
   hash TEXT UNIQUE,
   scraped_at DATETIME NOT NULL,
-  score INT CHECK (score BETWEEN 1 AND 100),
+  score INT CHECK (score BETWEEN 0 AND 100),
   score_reasoning TEXT
 );
+
+-- Append-only scoring history (HNTR-10). One score_runs row per pipeline
+-- run of one job against one profile; jobs.score/score_reasoning stay a
+-- latest-result cache for the UI, never the source of truth.
+CREATE TABLE score_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id INTEGER NOT NULL REFERENCES jobs (id),
+  profile_id INTEGER NOT NULL REFERENCES profiles (id),
+  pipeline_version TEXT NOT NULL,
+  weights_version TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('scored', 'rejected', 'failed')),
+  score INT CHECK (score BETWEEN 0 AND 100),
+  explanation TEXT,
+  eligibility_reasons TEXT CHECK (
+    eligibility_reasons IS NULL OR json_valid(eligibility_reasons)
+  ), -- JSON array of {code, detail}
+  unknowns TEXT CHECK (unknowns IS NULL OR json_valid(unknowns)),
+  warnings TEXT CHECK (warnings IS NULL OR json_valid(warnings)),
+  duration_ms INT CHECK (duration_ms >= 0),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_score_runs_job_profile ON score_runs (job_id, profile_id, created_at);
+
+-- One row per registered layer per run: success rows carry scores and
+-- versions, skip/failure rows carry bounded failure diagnostics.
+CREATE TABLE score_layer_results (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  score_run_id INTEGER NOT NULL REFERENCES score_runs (id),
+  layer TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('success', 'skip', 'failure')),
+  algorithm_version TEXT,
+  model TEXT,
+  prompt_version TEXT,
+  score INT CHECK (score BETWEEN 0 AND 100),
+  explanation TEXT,
+  duration_ms INT CHECK (duration_ms >= 0),
+  details TEXT CHECK (details IS NULL OR json_valid(details)),
+  failure_code TEXT,
+  failure_detail TEXT CHECK (
+    failure_detail IS NULL OR length(failure_detail) <= 500
+  ),
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_score_layer_results_run ON score_layer_results (score_run_id);
 
 CREATE TABLE applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,10 +311,13 @@ CREATE TABLE resume_items (
     OR relevance_score BETWEEN 0 AND 100
   ),
   score_reasoning TEXT,
+  score_is_fallback BOOLEAN NOT NULL DEFAULT 0 CHECK (score_is_fallback IN (0, 1)),
   order_idx INTEGER NOT NULL DEFAULT 0
 );
 
 -- Audit log: one row per tailoring run that produced a variant for a job.
+-- duration_ms records the wall-clock time of the whole run (scoring plus
+-- variant writes).
 CREATE TABLE resume_tailor_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source_profile_id INTEGER NOT NULL REFERENCES resume_profiles (id) ON DELETE CASCADE,
@@ -270,8 +325,30 @@ CREATE TABLE resume_tailor_runs (
   job_id INTEGER NOT NULL REFERENCES jobs (id),
   model TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Audit detail: one scored fact per run, whether kept or dropped. Items
+-- below the relevance threshold never reach the variant, so this table is
+-- the only place their scores and reasoning survive for analytics.
+-- item_content is a JSON snapshot because base items can be edited or
+-- deleted after the run.
+CREATE TABLE resume_tailor_run_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id INTEGER NOT NULL REFERENCES resume_tailor_runs (id) ON DELETE CASCADE,
+  section_type TEXT NOT NULL,
+  item_content TEXT NOT NULL,
+  score REAL CHECK (
+    score IS NULL
+    OR score BETWEEN 0 AND 100
+  ),
+  reasoning TEXT,
+  is_fallback BOOLEAN NOT NULL DEFAULT 0 CHECK (is_fallback IN (0, 1)),
+  kept BOOLEAN NOT NULL CHECK (kept IN (0, 1))
+);
+
+CREATE INDEX idx_resume_tailor_run_items_run ON resume_tailor_run_items (run_id);
 
 -- Saved export configurations: which format and sections to compile.
 -- section_filters holds a JSON-encoded list of section type names, or

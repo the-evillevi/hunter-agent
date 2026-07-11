@@ -8,6 +8,7 @@
           <th>Location</th>
           <th>Source</th>
           <th>Score</th>
+          <th>Tailor resume</th>
           <th></th>
         </tr>
       </thead>
@@ -21,6 +22,32 @@
             <td>
               {% if job.score is not none %}
                 <span class="badge badge-outline">{{ job.score }}/100</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if base_resumes %}
+                <form
+                  class="flex items-center gap-1"
+                  hx-post="/jobs/{{ job.id }}/tailor"
+                  hx-target="#tailor-result-{{ job.id }}"
+                  hx-swap="innerHTML"
+                >
+                  <select
+                    class="select select-bordered select-sm"
+                    name="resume_id"
+                    required
+                  >
+                    {% for resume in base_resumes %}
+                      <option value="{{ resume.id }}">{{ resume.name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="btn btn-primary btn-sm">
+                    Tailor
+                  </button>
+                </form>
+                <div id="tailor-result-{{ job.id }}"></div>
+              {% else %}
+                <a class="link text-sm" href="/resumes">Add a resume first</a>
               {% endif %}
             </td>
             <td>

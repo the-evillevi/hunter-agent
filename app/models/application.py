@@ -36,7 +36,11 @@ class Application(SQLModel, table=True):
 
 
 class ApplicationListItem(SQLModel):
-    """Display shape for one application card in the HTMX template."""
+    """Display shape for one application card in the HTMX template.
+
+    ``resume_id``/``resume_name`` point at the newest tailored resume for
+    the application's job, or stay None when the job was never tailored.
+    """
 
     id: int
     job_title: str
@@ -46,3 +50,5 @@ class ApplicationListItem(SQLModel):
     applied_at: datetime | None
     last_updated: datetime
     notes: str | None
+    resume_id: int | None = None
+    resume_name: str | None = None

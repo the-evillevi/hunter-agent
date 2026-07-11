@@ -1,0 +1,202 @@
+<!doctype html>
+{# Standalone resume export: no Tailwind, no CDN, no JS. Inline print-first
+   CSS keeps the file self-contained for email attachments and lets
+   WeasyPrint render the exact same document to PDF. #}
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{{ basics.get("name") or "Resume" }}</title>
+    <style>
+      body {
+        font-family: Georgia, "Times New Roman", serif;
+        color: #1a1a1a;
+        max-width: 46rem;
+        margin: 2rem auto;
+        padding: 0 1.5rem;
+        line-height: 1.45;
+        font-size: 11pt;
+      }
+      header {
+        text-align: center;
+        border-bottom: 2px solid #1a1a1a;
+        padding-bottom: 0.75rem;
+        margin-bottom: 1.25rem;
+      }
+      h1 {
+        margin: 0;
+        font-size: 22pt;
+        letter-spacing: 0.02em;
+      }
+      .label {
+        font-size: 12pt;
+        margin: 0.25rem 0;
+      }
+      .contact {
+        font-size: 9.5pt;
+        color: #444;
+      }
+      h2 {
+        font-size: 12pt;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        border-bottom: 1px solid #999;
+        padding-bottom: 0.15rem;
+        margin: 1.25rem 0 0.5rem;
+      }
+      .entry {
+        margin-bottom: 0.75rem;
+      }
+      .entry-heading {
+        display: flex;
+        justify-content: space-between;
+        font-weight: bold;
+      }
+      .entry-meta {
+        font-weight: normal;
+        font-style: italic;
+        color: #444;
+        font-size: 10pt;
+      }
+      ul {
+        margin: 0.25rem 0 0;
+        padding-left: 1.25rem;
+      }
+      li {
+        margin-bottom: 0.15rem;
+      }
+      .score {
+        font-size: 8.5pt;
+        color: #666;
+        background: #f0f0f0;
+        border-radius: 3px;
+        padding: 0 0.3rem;
+      }
+      @media print {
+        body {
+          margin: 0 auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>{{ basics.get("name", "") }}</h1>
+      {% if basics.get("label") %}
+        <p class="label">{{ basics["label"] }}</p>
+      {% endif %}
+      <p class="contact">
+        {{ basics.get("email", "") }}
+        {%- if basics.get("phone") %}· {{ basics["phone"] }}{% endif %}
+        {%- for profile in basics.get("profiles", []) %}
+          · {{ profile.get("network", "") }}: {{ profile.get("username", "") }}
+        {%- endfor %}
+      </p>
+    </header>
+
+    {% for section in sections %}
+      {% if section.section_type == section_type.summary %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          {# The first summary item is the preferred wording; alternates stay
+             in the data for the tailor layer but are not printed. #}
+          {% if section.items %}
+            <p>{{ section.items[0].content.get("text", "") }}</p>
+          {% endif %}
+        </section>
+      {% elif section.section_type == section_type.experience %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          {% for item in section.items %}
+            <div class="entry">
+              <div class="entry-heading">
+                <span>
+                  {{ item.content.get("position", "") }} ·
+                  {{ item.content.get("company", "") }}
+                  {% if include_scores and item.relevance_score is not none %}
+                    <span class="score"
+                      >{{ item.relevance_score | round | int }}</span
+                    >
+                  {% endif %}
+                </span>
+                <span class="entry-meta">
+                  {{ item.content.get("start_date", "") }} –
+                  {{ item.content.get("end_date") or "Present" }}
+                  {%- if item.content.get("location") %}
+                    · {{ item.content["location"] }}
+                  {% endif %}
+                </span>
+              </div>
+              <ul>
+                {% for highlight in item.content.get("highlights", []) %}
+                  <li>{{ highlight }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </section>
+      {% elif section.section_type == section_type.skills %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          <ul>
+            {% for item in section.items %}
+              <li>
+                <strong>{{ item.content.get("category", "") }}:</strong>
+                {{ item.content.get("detail") or item.content.get("keywords", []) | join(", ") }}
+                {% if include_scores and item.relevance_score is not none %}
+                  <span class="score"
+                    >{{ item.relevance_score | round | int }}</span
+                  >
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% elif section.section_type == section_type.projects %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          {% for item in section.items %}
+            <div class="entry">
+              <div class="entry-heading">
+                <span>{{ item.content.get("name", "") }}</span>
+                {% if item.content.get("publisher") %}
+                  <span class="entry-meta"
+                    >{{ item.content["publisher"] }}</span
+                  >
+                {% endif %}
+              </div>
+              <p>{{ item.content.get("description", "") }}</p>
+            </div>
+          {% endfor %}
+        </section>
+      {% elif section.section_type == section_type.education %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          {% for item in section.items %}
+            <div class="entry">
+              <div class="entry-heading">
+                <span>{{ item.content.get("degree", "") }}</span>
+                <span class="entry-meta"
+                  >{{ item.content.get("institution", "") }}</span
+                >
+              </div>
+            </div>
+          {% endfor %}
+        </section>
+      {% elif section.section_type == section_type.certifications %}
+        <section>
+          <h2>{{ section.title }}</h2>
+          <ul>
+            {% for item in section.items %}
+              <li>
+                {{ item.content.get("name", "") }}
+                {%- if item.content.get("issuer") %}
+                  — {{ item.content["issuer"] }}
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+    {% endfor %}
+  </body>
+</html>

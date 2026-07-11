@@ -111,13 +111,22 @@ class GuardedPayload(BaseModel):
     flags: tuple[SuspicionFlag, ...]
 
     def render_prompt(self) -> str:
-        """Compose the final prompt: trusted text first, untrusted fenced.
+        """Compose one full prompt: trusted text first, untrusted fenced.
+
+        For providers with separate system and user roles, prefer sending
+        ``instructions`` as the system prompt and ``render_untrusted()`` as
+        the user message — role separation is a stronger boundary than
+        position within one string.
+        """
+        return f"{self.instructions}\n{self.render_untrusted()}"
+
+    def render_untrusted(self) -> str:
+        """Render only the fenced sections plus the closing trusted reminder.
 
         Untrusted text is never interpolated into the instruction section;
-        it only ever appears between its own BEGIN/END markers, followed by
-        a closing trusted reminder that the fenced content is data.
+        it only ever appears between its own BEGIN/END markers.
         """
-        parts = [self.instructions]
+        parts = []
         for section in self.sections:
             parts.append(SECTION_BEGIN.format(label=section.label))
             parts.append(section.text)

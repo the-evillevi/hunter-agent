@@ -12,6 +12,7 @@ from sqlmodel import Session, select
 from app.models.company import Company
 from app.models.job import Job
 from app.models.profile import (
+    AdzunaProfileQuery,
     Keyword,
     KeywordKind,
     LocationType,
@@ -29,9 +30,12 @@ from app.services.sources import (
     normalize_source_name,
 )
 
+type SourceProfileQuery = AdzunaProfileQuery | RemotiveProfileQuery
+
 # One query schema per source; new adapters register their schema here so the
-# service and routes stay source-agnostic (HNTR-18 adds Adzuna).
-SOURCE_QUERY_SCHEMAS: dict[str, type[RemotiveProfileQuery]] = {
+# service and routes stay source-agnostic.
+SOURCE_QUERY_SCHEMAS: dict[str, type[SourceProfileQuery]] = {
+    "adzuna": AdzunaProfileQuery,
     "remotive": RemotiveProfileQuery,
 }
 
@@ -52,7 +56,7 @@ class ProfileConflictError(ProfileError):
 class ProfileQueryView:
     row: ProfileSourceQuery
     source_name: str
-    query: RemotiveProfileQuery
+    query: SourceProfileQuery
     company_name: str | None
 
 
@@ -67,7 +71,7 @@ class ProfileDetail:
 
 @dataclass(frozen=True)
 class ValidatedSourceQuery:
-    query: RemotiveProfileQuery
+    query: SourceProfileQuery
     company: Company | None
 
 
@@ -416,14 +420,14 @@ def _get_source(session: Session, source_id: int) -> Source:
         raise ProfileNotFoundError(str(error)) from error
 
 
-def _query_schema_for(source: Source) -> type[RemotiveProfileQuery]:
+def _query_schema_for(source: Source) -> type[SourceProfileQuery]:
     schema = SOURCE_QUERY_SCHEMAS.get(normalize_source_name(source.name))
     if schema is None:
         raise ProfileError(f'no query schema is registered for source "{source.name}"')
     return schema
 
 
-def _parse_source_query(source: Source, query_json: str) -> RemotiveProfileQuery:
+def _parse_source_query(source: Source, query_json: str) -> SourceProfileQuery:
     schema = _query_schema_for(source)
     try:
         raw_query = json.loads(query_json)
@@ -432,7 +436,7 @@ def _parse_source_query(source: Source, query_json: str) -> RemotiveProfileQuery
     try:
         return schema.model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(_format_query_validation_error(error)) from error
+        raise ProfileError(_format_query_validation_error(source, error)) from error
 
 
 def _validate_source_query_json(
@@ -451,15 +455,17 @@ def _validated_query_json(session: Session, source: Source, raw_query: dict) -> 
     try:
         query = schema.model_validate(raw_query)
     except ValidationError as error:
-        raise ProfileError(_format_query_validation_error(error)) from error
+        raise ProfileError(_format_query_validation_error(source, error)) from error
     _resolve_query_company(session, query)
     return query.model_dump_json(exclude_none=True)
 
 
 def _resolve_query_company(
     session: Session,
-    query: RemotiveProfileQuery,
+    query: SourceProfileQuery,
 ) -> Company | None:
+    if not isinstance(query, RemotiveProfileQuery):
+        return None
     if query.company_id is None:
         return None
     company = session.get(Company, query.company_id)
@@ -468,14 +474,21 @@ def _resolve_query_company(
     return company
 
 
-def _format_query_validation_error(error: ValidationError) -> str:
+def _format_query_validation_error(source: Source, error: ValidationError) -> str:
     messages = []
+    source_name = source.name.lower()
     for issue in error.errors():
         field = ".".join(str(part) for part in issue["loc"]) or "query"
-        if field == "category":
+        if field == "category" and source_name == "remotive":
             messages.append("category must be one of the supported Remotive categories")
+        elif field == "category":
+            messages.append("category must not be blank")
         elif field == "search":
             messages.append("search must not be blank")
+        elif field == "what":
+            messages.append("what is required")
+        elif field == "where":
+            messages.append("where must not be blank")
         elif field == "limit":
             messages.append("limit must be between 1 and 10")
         elif field == "company_id":

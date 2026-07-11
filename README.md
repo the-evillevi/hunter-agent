@@ -34,10 +34,21 @@ containing database helpers plus the local SQLite database.
 
 Full HTML pages use the resource path, such as `/companies` and `/jobs`.
 Dedicated fragment reads use `/{resource}/partials/{fragment}`, such as
-`/companies/partials/table` or `/jobs/partials/list`, and are excluded from
-OpenAPI because they are internal UI surfaces. Mutations keep meaningful
+`/companies/partials/table` or `/jobs/partials/list`. Mutations keep meaningful
 resource or action URLs even when their response is an HTML fragment; returning
 HTML alone does not put a route under `/partials`.
+
+### API documentation
+
+FastAPI serves interactive Swagger docs at `/docs` and the raw schema at
+`/openapi.json`. Their audience is API consumers and automation: only JSON
+operations appear there, grouped under intentional tags (`Monitoring`,
+`Ingestion`) with summaries and typed success/error responses. Every HTML and
+HTMX route — full pages, fragment reads, and fragment-returning mutations — is
+an internal UI surface and sets `include_in_schema=False`, so the browser UI
+never leaks into the API docs. `tests/test_openapi.py` enforces this policy;
+if you add a route, that test tells you whether it must be tagged and
+summarized (JSON API) or excluded (UI).
 
 ## Quickstart
 
