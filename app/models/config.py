@@ -106,7 +106,7 @@ class OllamaConfig(StrictConfigModel):
 class CloudModelConfig(StrictConfigModel):
     """One cloud completion provider/model assignment."""
 
-    provider: Literal["openai"]
+    provider: Literal["anthropic", "openai"]
     model: str = Field(min_length=1)
     temperature: float = Field(ge=0, le=1)
     max_tokens: int = Field(gt=0)
@@ -122,7 +122,11 @@ class CloudModelConfig(StrictConfigModel):
 
 
 class CloudAIConfig(StrictConfigModel):
-    """Independent OpenAI model assignments for CV tailoring roles."""
+    """Cloud model assignments for the CV tailoring roles.
+
+    Role assignment is data, not code: any configured provider/model can
+    fill either role, including the same provider in both.
+    """
 
     generator: CloudModelConfig
     critic: CloudModelConfig

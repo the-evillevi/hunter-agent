@@ -42,12 +42,14 @@ max_tokens = 2048     # full CV section rewrites
 
 # ============================================================
 # CLOUD AI - CV TAILORING
-# The API key is read only from OPENAI_API_KEY.
+# API keys are read only from environment variables:
+# ANTHROPIC_API_KEY and OPENAI_API_KEY. Either provider can fill
+# either role; swap the pairing here, no code changes needed.
 # ============================================================
 
 [ai.generator]
-provider = "openai"
-model = "gpt-5.5"
+provider = "anthropic"
+model = "claude-opus-4-8"
 temperature = 0.3
 max_tokens = 4096
 
