@@ -9,7 +9,7 @@ job shapes are defined once and consumed by services.
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny
+from pydantic import BaseModel, ConfigDict, Field, SerializeAsAny, model_validator
 
 from app.models.eligibility import EligibilityResult
 
@@ -46,6 +46,23 @@ class KeywordScoreResult(ScoreLayerResult):
     excluded_terms_found: tuple[str, ...]
 
 
+class SemanticScoreResult(ScoreLayerResult):
+    """Semantic-layer result keeping model identity and the raw similarity."""
+
+    model: str = Field(min_length=1)
+    similarity: float = Field(ge=-1, le=1, allow_inf_nan=False)
+
+
+class LlmScoreResult(ScoreLayerResult):
+    """LLM-layer result keeping model, prompt, and safety audit metadata."""
+
+    model: str = Field(min_length=1)
+    prompt_version: str = Field(min_length=1)
+    duration_ms: int = Field(ge=0)
+    attempts: int = Field(ge=1)
+    guard_flag_codes: tuple[str, ...]
+
+
 class LayerOutcome(BaseModel):
     """What happened to one registered layer during a pipeline run.
 
@@ -62,6 +79,27 @@ class LayerOutcome(BaseModel):
     duration_ms: int = Field(ge=0)
     failure_code: str | None = None
     failure_detail: str | None = None
+
+    @model_validator(mode="after")
+    def success_must_carry_a_result(self) -> "LayerOutcome":
+        """Keep success and failure payloads mutually consistent."""
+        if self.status == "success":
+            if self.result is None:
+                raise ValueError("a successful layer outcome must include its result")
+            if self.result.layer != self.layer:
+                raise ValueError(
+                    "a layer outcome and its result must use the same name"
+                )
+            if self.failure_code is not None or self.failure_detail is not None:
+                raise ValueError("a successful layer outcome cannot include a failure")
+        else:
+            if self.result is not None:
+                raise ValueError("a skipped or failed layer cannot include a result")
+            if not self.failure_code:
+                raise ValueError(
+                    "a skipped or failed layer must include a failure code"
+                )
+        return self
 
 
 class JobScoreResult(BaseModel):
@@ -84,3 +122,35 @@ class JobScoreResult(BaseModel):
     explanation: str
     pipeline_version: str
     weights_version: str
+
+    @model_validator(mode="after")
+    def status_and_score_must_agree(self) -> "JobScoreResult":
+        """Scored means a real aggregate exists; anything else means none does.
+
+        This is the invariant persistence relies on: a scored run always
+        caches a numeric aggregate, and a rejected or failed run never
+        writes one.
+        """
+        if self.status == "scored":
+            if self.score is None:
+                raise ValueError("a scored result must carry an aggregate score")
+            if not self.layer_outcomes:
+                raise ValueError("a scored result must carry its layer outcomes")
+            if not any(outcome.status == "success" for outcome in self.layer_outcomes):
+                raise ValueError("a scored result must include a successful layer")
+        elif self.score is not None:
+            raise ValueError("only scored results may carry an aggregate score")
+        if self.status == "rejected":
+            if self.eligibility.eligible:
+                raise ValueError("a rejected result requires an ineligible decision")
+            if not self.eligibility.reasons:
+                raise ValueError("a rejected result requires a rejection reason")
+            if self.layer_outcomes:
+                raise ValueError("a rejected result cannot include layer outcomes")
+        elif not self.eligibility.eligible:
+            raise ValueError("scored and failed results require an eligible decision")
+        if self.status == "failed" and any(
+            outcome.status == "success" for outcome in self.layer_outcomes
+        ):
+            raise ValueError("a failed result cannot include a successful layer")
+        return self

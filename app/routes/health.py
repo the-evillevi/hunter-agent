@@ -5,12 +5,23 @@ They are useful before the rest of the product is finished.
 """
 
 from fastapi import APIRouter
+from sqlmodel import SQLModel
 
 
-router = APIRouter()
+router = APIRouter(tags=["Monitoring"])
 
 
-@router.get("/health")
-def health_check() -> dict[str, str]:
+class HealthStatus(SQLModel):
+    """Response shape for the health check, so /docs shows a real schema."""
+
+    status: str
+
+
+@router.get(
+    "/health",
+    summary="Check that the app process is alive",
+    response_model=HealthStatus,
+)
+def health_check() -> HealthStatus:
     """Return a simple JSON response for uptime checks."""
-    return {"status": "ok"}
+    return HealthStatus(status="ok")

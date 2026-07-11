@@ -40,7 +40,7 @@ templates = Jinja2Templates(directory="app/templates")
 EXPORT_FORMATS = ("json", "json_resume", "html", "pdf")
 
 
-@router.get("/resumes", response_class=HTMLResponse)
+@router.get("/resumes", response_class=HTMLResponse, include_in_schema=False)
 def resumes_page(
     request: Request,
     session: Session = Depends(get_session),
@@ -83,7 +83,7 @@ def recent_tailor_runs_partial(
     )
 
 
-@router.post("/resumes", status_code=201)
+@router.post("/resumes", status_code=201, include_in_schema=False)
 async def create_resume(
     request: Request,
     session: Session = Depends(get_session),
@@ -124,7 +124,7 @@ async def create_resume(
     )
 
 
-@router.patch("/resumes/{resume_id}")
+@router.patch("/resumes/{resume_id}", include_in_schema=False)
 async def update_resume(
     resume_id: int,
     request: Request,
@@ -170,7 +170,11 @@ async def update_resume(
     return JSONResponse({"id": detail.id, "name": detail.name})
 
 
-@router.get("/resumes/{resume_id}", response_class=HTMLResponse)
+@router.get(
+    "/resumes/{resume_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 def resume_detail_page(
     resume_id: int,
     request: Request,
@@ -241,7 +245,11 @@ def _form_int(body: str, field: str) -> int:
         ) from error
 
 
-@router.post("/resumes/{resume_id}/tailor", response_class=HTMLResponse)
+@router.post(
+    "/resumes/{resume_id}/tailor",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def tailor_resume(
     resume_id: int,
     request: Request,
@@ -254,7 +262,11 @@ async def tailor_resume(
     )
 
 
-@router.post("/jobs/{job_id}/tailor", response_class=HTMLResponse)
+@router.post(
+    "/jobs/{job_id}/tailor",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def tailor_resume_for_job(
     job_id: int,
     request: Request,
@@ -267,7 +279,7 @@ async def tailor_resume_for_job(
     )
 
 
-@router.get("/resumes/{resume_id}/export")
+@router.get("/resumes/{resume_id}/export", include_in_schema=False)
 def export_resume(
     resume_id: int,
     format: str = "json",

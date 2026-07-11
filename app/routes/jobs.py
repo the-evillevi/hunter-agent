@@ -24,7 +24,7 @@ def _base_resumes(session: Session):
     return [resume for resume in list_resumes(session) if resume.base_resume_id is None]
 
 
-@router.get("/jobs", response_class=HTMLResponse)
+@router.get("/jobs", response_class=HTMLResponse, include_in_schema=False)
 def jobs_page(
     request: Request,
     session: Session = Depends(get_session),

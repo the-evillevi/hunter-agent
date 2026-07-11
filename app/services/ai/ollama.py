@@ -16,12 +16,8 @@ import httpx
 
 from app.models.config import OllamaConfig
 from app.services.ai.completion import CompletionRequest, CompletionResponse
-from app.services.ai.errors import (
-    AIConnectError,
-    AIHTTPError,
-    AIResponseError,
-    AITimeoutError,
-)
+from app.services.ai.errors import AIResponseError
+from app.services.ai.http import post_json
 
 
 PROVIDER_NAME = "ollama"
@@ -76,38 +72,16 @@ class OllamaCompletionProvider:
         payload = self._build_payload(request)
         started = time.perf_counter()
 
-        try:
-            async with httpx.AsyncClient(
-                transport=self._transport,
-                timeout=self._timeout_seconds,
-            ) as client:
-                response = await client.post(
-                    f"{self._base_url}/api/chat",
-                    json=payload,
-                )
-        except httpx.TimeoutException as error:
-            raise AITimeoutError(
-                f"Ollama timed out after {self._timeout_seconds}s: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
-        except httpx.TransportError as error:
-            raise AIConnectError(
-                f"could not reach Ollama at {self._base_url}: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
+        response = await post_json(
+            f"{self._base_url}/api/chat",
+            payload,
+            provider=self.provider_name,
+            model=self.model,
+            timeout_seconds=self._timeout_seconds,
+            transport=self._transport,
+        )
 
         duration_ms = max(0, round((time.perf_counter() - started) * 1000))
-
-        if not response.is_success:
-            raise AIHTTPError(
-                f"Ollama returned HTTP {response.status_code}",
-                provider=self.provider_name,
-                model=self.model,
-                status_code=response.status_code,
-            )
-
         return self._parse_response(response, duration_ms)
 
     def _build_payload(self, request: CompletionRequest) -> dict[str, Any]:

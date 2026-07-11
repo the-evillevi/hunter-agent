@@ -42,6 +42,9 @@ def _profiles_context(
     remotive = session.exec(
         select(Source).where(func.lower(Source.name) == "remotive")
     ).first()
+    adzuna = session.exec(
+        select(Source).where(func.lower(Source.name) == "adzuna")
+    ).first()
     try:
         profiles = list_profiles(session)
     except ProfileError as profile_error:
@@ -50,6 +53,7 @@ def _profiles_context(
     return {
         "profiles": profiles,
         "companies": companies,
+        "adzuna": adzuna,
         "remotive": remotive,
         "remotive_categories": list(RemotiveCategory),
         "location_types": [value.value for value in LocationType],
@@ -73,7 +77,7 @@ def _render_list(
     )
 
 
-@router.get("/profiles", response_class=HTMLResponse)
+@router.get("/profiles", response_class=HTMLResponse, include_in_schema=False)
 def profiles_page(
     request: Request,
     session: Session = Depends(get_session),
@@ -99,11 +103,12 @@ def profiles_list_partial(
     return _render_list(request, session)
 
 
-@router.post("/profiles", response_class=HTMLResponse)
+@router.post("/profiles", response_class=HTMLResponse, include_in_schema=False)
 async def create_profile_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Create a profile from the form and render the refreshed list."""
     form = await _read_form(request)
     try:
         create_profile(session, **_profile_values(form))
@@ -112,12 +117,17 @@ async def create_profile_route(
     return _render_list(request, session)
 
 
-@router.patch("/profiles/{profile_id}", response_class=HTMLResponse)
+@router.patch(
+    "/profiles/{profile_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 async def update_profile_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Update one profile from the form and render the refreshed list."""
     form = await _read_form(request)
     try:
         update_profile(session, profile_id, **_profile_values(form))
@@ -126,12 +136,17 @@ async def update_profile_route(
     return _render_list(request, session)
 
 
-@router.delete("/profiles/{profile_id}", response_class=HTMLResponse)
+@router.delete(
+    "/profiles/{profile_id}",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
 def delete_profile_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Delete one profile and render the refreshed list."""
     try:
         delete_profile(session, profile_id)
     except ProfileError as error:
@@ -142,12 +157,14 @@ def delete_profile_route(
 @router.post(
     "/profiles/{profile_id}/source-queries",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def create_source_query_route(
     profile_id: int,
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Attach a per-source search query to a profile and render the list."""
     form = await _read_form(request)
     return _mutate_query(
         request,
@@ -164,6 +181,7 @@ async def create_source_query_route(
 @router.patch(
     "/profiles/{profile_id}/source-queries/{query_id}",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 async def update_source_query_route(
     profile_id: int,
@@ -171,6 +189,7 @@ async def update_source_query_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Update one per-source search query and render the refreshed list."""
     form = await _read_form(request)
     return _mutate_query(
         request,
@@ -187,6 +206,7 @@ async def update_source_query_route(
 @router.delete(
     "/profiles/{profile_id}/source-queries/{query_id}",
     response_class=HTMLResponse,
+    include_in_schema=False,
 )
 def delete_source_query_route(
     profile_id: int,
@@ -194,6 +214,7 @@ def delete_source_query_route(
     request: Request,
     session: Session = Depends(get_session),
 ) -> HTMLResponse:
+    """Delete one per-source search query and render the refreshed list."""
     try:
         delete_source_query(session, profile_id=profile_id, query_id=query_id)
     except ProfileError as error:
@@ -251,14 +272,17 @@ def _profile_values(form: dict[str, list[str]]) -> dict:
 
 
 def _query_values(form: dict[str, list[str]]) -> dict:
-    raw_query: dict = {
-        "schema_version": 1,
-        "limit": _integer(form, "limit", "limit"),
-    }
-    for field in ("category", "search"):
+    raw_query: dict = {"schema_version": 1}
+    for field in ("category", "search", "what", "where"):
         value = _one(form, field, "").strip()
         if value:
             raw_query[field] = value
+    for field in ("full_time", "permanent"):
+        if _one(form, field, "") == "true":
+            raw_query[field] = True
+    limit = _one(form, "limit", "").strip()
+    if limit:
+        raw_query["limit"] = _integer(form, "limit", "limit")
     company_id = _one(form, "company_id", "").strip()
     if company_id:
         raw_query["company_id"] = _integer(form, "company_id", "company")

@@ -25,8 +25,9 @@ def test_load_config_returns_validated_model() -> None:
 
     assert isinstance(config, AppConfig)
     assert config.agent.name == "hunter-agent"
-    assert config.ai.generator.provider == "openai"
-    assert config.ai.generator.model == "gpt-5.5"
+    # The decided default pairing: Opus 4.8 generates, GPT 5.5 critiques.
+    assert config.ai.generator.provider == "anthropic"
+    assert config.ai.generator.model == "claude-opus-4-8"
     assert config.ai.critic.provider == "openai"
     assert config.ai.critic.model == "gpt-5.5"
     assert "profiles" not in load_raw_config()

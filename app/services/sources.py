@@ -280,3 +280,12 @@ def make_job_identity_hash(
 
 
 default_source_registry = JobSourceRegistry()
+
+
+# Importing an adapter module lets it register itself with the default
+# registry, so a plain ``import app.services.sources`` is ready to resolve
+# sources. Adapter modules import from this module, so this import must stay
+# at the bottom, after every name they need is defined; importing the module
+# object (not a name from it) keeps both import orders free of circular-import
+# errors.
+from app.services import adzuna, remotive  # noqa: E402,F401
