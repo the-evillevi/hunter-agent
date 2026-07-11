@@ -1,6 +1,5 @@
 """OpenAI Responses API adapter for the neutral completion protocol."""
 
-import json
 import time
 from collections.abc import Mapping
 from typing import Any, Literal
@@ -9,10 +8,11 @@ import httpx
 
 from app.models.config import CloudModelConfig
 from app.services.ai.completion import CompletionRequest, CompletionResponse
-from app.services.ai.errors import AIConnectError, AIResponseError, AITimeoutError
+from app.services.ai.errors import AIResponseError
 from app.services.ai.http import (
     DEFAULT_CLOUD_TIMEOUT_SECONDS,
-    raise_for_provider_status,
+    json_object_body,
+    post_json,
     require_api_key,
     validate_timeout,
 )
@@ -57,35 +57,16 @@ class OpenAICompletionProvider:
     async def complete(self, request: CompletionRequest) -> CompletionResponse:
         """Send one Responses request and normalize its response."""
         started = time.perf_counter()
-        try:
-            async with httpx.AsyncClient(
-                transport=self._transport,
-                timeout=self._timeout_seconds,
-            ) as client:
-                response = await client.post(
-                    f"{self._base_url}/v1/responses",
-                    headers={"authorization": f"Bearer {self._api_key}"},
-                    json=self._build_payload(request),
-                )
-        except httpx.TimeoutException as error:
-            raise AITimeoutError(
-                f"OpenAI timed out after {self._timeout_seconds}s: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
-        except httpx.TransportError as error:
-            raise AIConnectError(
-                f"could not reach OpenAI: {error}",
-                provider=self.provider_name,
-                model=self.model,
-            ) from error
-
-        duration_ms = max(0, round((time.perf_counter() - started) * 1000))
-        raise_for_provider_status(
-            response,
+        response = await post_json(
+            f"{self._base_url}/v1/responses",
+            self._build_payload(request),
             provider=self.provider_name,
             model=self.model,
+            timeout_seconds=self._timeout_seconds,
+            transport=self._transport,
+            headers={"authorization": f"Bearer {self._api_key}"},
         )
+        duration_ms = max(0, round((time.perf_counter() - started) * 1000))
         return self._parse_response(response, duration_ms)
 
     def _build_payload(self, request: CompletionRequest) -> dict[str, Any]:
@@ -93,12 +74,16 @@ class OpenAICompletionProvider:
             "model": self.model,
             "input": request.prompt,
             "max_output_tokens": request.max_tokens or self._max_tokens,
-            "temperature": (
-                request.temperature
-                if request.temperature is not None
-                else self._temperature
-            ),
         }
+        # Reasoning-family models (the gpt-5.5 default) reject sampling
+        # parameters, so temperature is only sent when someone asked for it.
+        temperature = (
+            request.temperature
+            if request.temperature is not None
+            else self._temperature
+        )
+        if temperature is not None:
+            payload["temperature"] = temperature
         if request.system_prompt is not None:
             payload["instructions"] = request.system_prompt
         if request.response_schema is not None:
@@ -117,7 +102,7 @@ class OpenAICompletionProvider:
         response: httpx.Response,
         duration_ms: int,
     ) -> CompletionResponse:
-        body = _json_object(response, self.model)
+        body = json_object_body(response, provider=self.provider_name, model=self.model)
         status = body.get("status")
         if status not in ("completed", "incomplete"):
             raise _response_error(
@@ -175,16 +160,6 @@ def _finish_reason(body: dict[str, Any]) -> Literal["stop", "length", "unknown"]
     if isinstance(details, dict) and details.get("reason") == "max_output_tokens":
         return "length"
     return "unknown"
-
-
-def _json_object(response: httpx.Response, model: str) -> dict[str, Any]:
-    try:
-        body = response.json()
-    except (json.JSONDecodeError, ValueError) as error:
-        raise _response_error(f"OpenAI returned non-JSON: {error}", model) from error
-    if not isinstance(body, dict):
-        raise _response_error("OpenAI response JSON is not an object", model)
-    return body
 
 
 def _response_error(message: str, model: str) -> AIResponseError:

@@ -104,11 +104,18 @@ class OllamaConfig(StrictConfigModel):
 
 
 class CloudModelConfig(StrictConfigModel):
-    """One cloud completion provider/model assignment."""
+    """One cloud completion provider/model assignment.
+
+    ``temperature`` is optional because the current frontier defaults
+    (claude-opus-4-8, gpt-5.5) reject sampling parameters outright; None
+    means "let the provider use its own default". The 0-2 bound matches
+    the completion protocol; Anthropic's own 0-1 cap is enforced by its
+    adapter.
+    """
 
     provider: Literal["anthropic", "openai"]
     model: str = Field(min_length=1)
-    temperature: float = Field(ge=0, le=1)
+    temperature: float | None = Field(default=None, ge=0, le=2)
     max_tokens: int = Field(gt=0)
 
     @field_validator("model")

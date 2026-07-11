@@ -266,3 +266,45 @@ def test_wrong_provider_config_is_rejected_before_network_use() -> None:
             invalid,
             environment={"ANTHROPIC_API_KEY": "test"},
         )
+
+
+def test_temperature_is_omitted_unless_configured_or_requested() -> None:
+    """claude-opus-4-8 rejects sampling parameters; None must mean absent."""
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=response_body())
+
+    provider = AnthropicCompletionProvider(
+        CloudModelConfig(provider="anthropic", model="claude-opus-4-8", max_tokens=64),
+        transport=httpx.MockTransport(handler),
+        environment={"ANTHROPIC_API_KEY": "anthropic-test-key"},
+    )
+    asyncio.run(provider.complete(CompletionRequest(prompt="draft")))
+
+    assert "temperature" not in captured
+
+
+def test_temperature_above_anthropic_cap_is_a_configuration_error() -> None:
+    """The protocol allows up to 2; Anthropic caps at 1 — fail clearly."""
+    transport = httpx.MockTransport(
+        lambda request: httpx.Response(200, json=response_body())
+    )
+
+    with pytest.raises(AIConfigurationError, match="<= 1"):
+        asyncio.run(
+            make_provider(transport).complete(
+                CompletionRequest(prompt="draft", temperature=1.5)
+            )
+        )
+
+
+@pytest.mark.parametrize("timeout", [0.0, -1.0, float("nan"), float("inf")])
+def test_invalid_timeout_is_rejected(timeout: float) -> None:
+    with pytest.raises(ValueError, match="finite and positive"):
+        AnthropicCompletionProvider(
+            cloud_model(),
+            environment={"ANTHROPIC_API_KEY": "test"},
+            timeout_seconds=timeout,
+        )
