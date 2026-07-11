@@ -258,3 +258,21 @@ def test_wrong_provider_config_is_rejected_before_network_use() -> None:
             invalid,
             environment={"OPENAI_API_KEY": "test"},
         )
+
+
+def test_temperature_is_omitted_unless_configured_or_requested() -> None:
+    """gpt-5.5 rejects sampling parameters; None must mean absent."""
+    captured: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured.update(json.loads(request.content))
+        return httpx.Response(200, json=response_body())
+
+    provider = OpenAICompletionProvider(
+        CloudModelConfig(provider="openai", model="gpt-5.5", max_tokens=64),
+        transport=httpx.MockTransport(handler),
+        environment={"OPENAI_API_KEY": "openai-test-key"},
+    )
+    asyncio.run(provider.complete(CompletionRequest(prompt="review")))
+
+    assert "temperature" not in captured

@@ -80,7 +80,7 @@ def test_ollama_settings_are_validated(field: str, value: object) -> None:
         ("generator", "provider", "other"),
         ("critic", "model", " "),
         ("generator", "temperature", -0.1),
-        ("critic", "temperature", 1.1),
+        ("critic", "temperature", 2.1),
         ("generator", "max_tokens", 0),
     ],
 )

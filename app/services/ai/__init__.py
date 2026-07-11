@@ -11,15 +11,14 @@ from app.services.ai.completion import (
     CompletionRequest,
     CompletionResponse,
 )
-from app.services.ai.anthropic import AnthropicCompletionProvider
 from app.services.ai.factory import create_cloud_completion_provider
-from app.services.ai.openai import OpenAICompletionProvider
 
+# Only the neutral contract and the factory are exported: feature code
+# must not import a provider client directly (see AGENTS.md), so the
+# package root deliberately hides the concrete adapters.
 __all__ = [
-    "AnthropicCompletionProvider",
     "CompletionProvider",
     "CompletionRequest",
     "CompletionResponse",
-    "OpenAICompletionProvider",
     "create_cloud_completion_provider",
 ]
