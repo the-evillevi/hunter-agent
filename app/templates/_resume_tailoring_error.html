@@ -2,8 +2,12 @@
   <div>
     <p class="font-medium">Tailoring could not be completed.</p>
     <p class="text-sm">
-      The {{ provider }} provider is unavailable: {{ message }}. The master
-      resume was not modified and no partial variant was saved.
+      {% if provider %}
+        The {{ provider }} provider is unavailable: {{ message }}.
+      {% else %}
+        {{ message }}.
+      {% endif %}
+      The master resume was not modified and no partial variant was saved.
     </p>
   </div>
 </div>

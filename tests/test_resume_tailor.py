@@ -16,106 +16,15 @@ from app.services.resume_crud import get_resume_detail, list_resumes
 from app.services.resume_import import import_resume, load_resume_document
 from app.services.resume_scoring import ResumeItemScorer, load_versioned_prompt
 from app.services.resume_tailor import ResumeTailor
-
-
-FIXTURE_PATH = Path(__file__).parent / "fixtures" / "resume_sample.json"
-Responder = Callable[[CompletionRequest, int], str]
-
-
-class FakeCompletionProvider:
-    """Protocol-compatible provider that records every in-memory request."""
-
-    def __init__(
-        self,
-        provider_name: str,
-        model: str,
-        responder: Responder,
-        *,
-        response_model: str | None = None,
-    ) -> None:
-        self.provider_name = provider_name
-        self.model = model
-        self.response_model = response_model or model
-        self.responder = responder
-        self.requests: list[CompletionRequest] = []
-
-    async def complete(self, request: CompletionRequest) -> CompletionResponse:
-        self.requests.append(request)
-        text = self.responder(request, len(self.requests))
-        return CompletionResponse(
-            text=text,
-            provider=self.provider_name,
-            model=self.response_model,
-            duration_ms=1,
-            finish_reason="stop",
-            raw_usage={"fake_tokens": 1},
-        )
-
-
-def local_responder(request: CompletionRequest, call_number: int) -> str:
-    score = 90 if "IBM" in request.prompt else 20
-    reasoning = "Directly relevant." if score == 90 else "Unrelated to this job."
-    return json.dumps({"score": score, "reasoning": reasoning})
-
-
-def _source_document(prompt: str) -> dict[str, Any]:
-    for marker in ("TRUSTED_RESUME_JSON:", "TRUSTED_SOURCE_JSON:"):
-        if marker in prompt:
-            tail = prompt.split(marker, 1)[1]
-            document, _end = json.JSONDecoder().raw_decode(tail)
-            return document
-    raise AssertionError("trusted source JSON marker missing")
-
-
-def generator_responder(request: CompletionRequest, call_number: int) -> str:
-    source = _source_document(request.prompt)
-    draft = {
-        "sections": [
-            {
-                "section_type": section["section_type"],
-                "title": section["title"],
-                "items": [
-                    {
-                        "source_item_id": item["source_item_id"],
-                        "content_json": json.dumps(item["content"]),
-                    }
-                    for item in section["items"]
-                    if item["eligible_for_tailoring"]
-                ],
-            }
-            for section in source["sections"]
-            if any(item["eligible_for_tailoring"] for item in section["items"])
-        ]
-    }
-    return json.dumps(draft)
-
-
-def critic_responder(request: CompletionRequest, call_number: int) -> str:
-    return json.dumps(
-        {
-            "fit_summary": "The supported evidence fits the role.",
-            "missing_evidence": [],
-            "overclaims": [],
-            "required_changes": [],
-        }
-    )
-
-
-def build_tailor(
-    *,
-    local: FakeCompletionProvider | None = None,
-    generator: FakeCompletionProvider | None = None,
-    critic: FakeCompletionProvider | None = None,
-) -> ResumeTailor:
-    local_provider = local or FakeCompletionProvider(
-        "ollama", "local-test-model", local_responder
-    )
-    return ResumeTailor(
-        scorer=ResumeItemScorer(local_provider),
-        generator=generator
-        or FakeCompletionProvider("openai", "gpt-5.5", generator_responder),
-        critic=critic or FakeCompletionProvider("openai", "gpt-5.5", critic_responder),
-    )
+from tailoring_fakes import (
+    RESUME_FIXTURE_PATH,
+    FakeCompletionProvider,
+    build_tailor,
+    critic_responder,
+    generator_responder,
+    local_responder,
+    source_document,
+)
 
 
 def run_tailor(
@@ -136,7 +45,7 @@ def run_tailor(
 
 @pytest.fixture()
 def base_resume_id(session: Session) -> int:
-    document = load_resume_document(FIXTURE_PATH)
+    document = load_resume_document(RESUME_FIXTURE_PATH)
     return import_resume(session, document).id
 
 
@@ -301,7 +210,7 @@ def test_critic_feedback_can_only_trigger_one_generator_revision(
 ) -> None:
     generator = FakeCompletionProvider("openai", "gpt-5.5", generator_responder)
 
-    def needs_revision(request: CompletionRequest, call_number: int) -> str:
+    def needs_revision(request: CompletionRequest) -> str:
         return json.dumps(
             {
                 "fit_summary": "Good evidence, but one claim needs clarification.",
@@ -323,7 +232,7 @@ def test_critic_feedback_can_only_trigger_one_generator_revision(
 
     assert len(critic.requests) == 1
     assert len(generator.requests) == 2
-    assert "STRUCTURED_CRITIQUE_DATA:" in generator.requests[1].prompt
+    assert "<<<UNTRUSTED:critic_feedback:BEGIN>>>" in generator.requests[1].prompt
     assert "<<<UNTRUSTED:critic_feedback:BEGIN>>>" in generator.requests[1].prompt
     assert "Use only the source wording." in generator.requests[1].prompt
     assert "Use only the source wording. <<<" not in generator.requests[1].prompt
@@ -334,7 +243,7 @@ def test_generator_cannot_use_unknown_or_misplaced_source_items(
     create_job,
     base_resume_id: int,
 ) -> None:
-    def invented_source(request: CompletionRequest, call_number: int) -> str:
+    def invented_source(request: CompletionRequest) -> str:
         return json.dumps(
             {
                 "sections": [
@@ -375,8 +284,8 @@ def test_generator_cannot_modify_master_contact_information(
     create_job,
     base_resume_id: int,
 ) -> None:
-    def changed_basics(request: CompletionRequest, call_number: int) -> str:
-        source = _source_document(request.prompt)
+    def changed_basics(request: CompletionRequest) -> str:
+        source = source_document(request.prompt)
         basics = next(
             section
             for section in source["sections"]
@@ -419,7 +328,7 @@ def test_critic_cannot_return_direct_resume_content(
     create_job,
     base_resume_id: int,
 ) -> None:
-    def injecting_critic(request: CompletionRequest, call_number: int) -> str:
+    def injecting_critic(request: CompletionRequest) -> str:
         return json.dumps(
             {
                 "fit_summary": "Fit",
@@ -578,3 +487,60 @@ def test_generator_schema_is_compatible_with_strict_structured_outputs() -> None
     for definition in schema["$defs"].values():
         if definition.get("type") == "object":
             assert definition["additionalProperties"] is False
+
+
+def test_nothing_relevant_fails_clearly_before_any_cloud_call(
+    session: Session,
+    create_job,
+    base_resume_id: int,
+) -> None:
+    """A resume with no relevant items must not burn a generator call."""
+    from app.services.resume_tailor import NoTailorableContentError
+
+    job = create_job(title="Data Engineer")
+
+    def all_irrelevant(request: CompletionRequest) -> str:
+        return json.dumps({"score": 5, "reasoning": "Nothing matches."})
+
+    generator = FakeCompletionProvider("openai", "gpt-5.5", generator_responder)
+    tailor = build_tailor(
+        local=FakeCompletionProvider("ollama", "local-test-model", all_irrelevant),
+        generator=generator,
+    )
+
+    with pytest.raises(NoTailorableContentError, match="relevance threshold"):
+        run_tailor(tailor, session, base_resume_id=base_resume_id, job_id=job.id)
+
+    assert generator.requests == []
+
+
+def test_draft_rides_fenced_into_critic_and_revision_prompts(
+    session: Session,
+    create_job,
+    base_resume_id: int,
+) -> None:
+    """Generator output derives from untrusted job text; the critic and the
+    revision must consume it fenced, never as trusted JSON."""
+    job = create_job(title="Data Engineer")
+
+    def needs_changes(request: CompletionRequest) -> str:
+        return json.dumps(
+            {
+                "fit_summary": "Needs work.",
+                "missing_evidence": ["quantify impact"],
+                "overclaims": [],
+                "required_changes": ["tighten summary"],
+            }
+        )
+
+    critic = FakeCompletionProvider("openai", "gpt-5.5", needs_changes)
+    generator = FakeCompletionProvider("openai", "gpt-5.5", generator_responder)
+    tailor = build_tailor(generator=generator, critic=critic)
+
+    run_tailor(tailor, session, base_resume_id=base_resume_id, job_id=job.id)
+
+    assert "<<<UNTRUSTED:generator_draft:BEGIN>>>" in critic.requests[0].prompt
+    assert "DRAFT_JSON:" not in critic.requests[0].prompt
+    revision_prompt = generator.requests[1].prompt
+    assert "<<<UNTRUSTED:previous_draft:BEGIN>>>" in revision_prompt
+    assert "PREVIOUS_DRAFT_JSON:" not in revision_prompt

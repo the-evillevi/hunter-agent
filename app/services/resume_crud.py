@@ -309,11 +309,9 @@ def list_recent_tailor_runs(session: Session, limit: int = 5) -> list[RecentTail
             resume_name=resume_name,
             job_id=job_id,
             job_title=job_title or "Untitled job",
-            model=(
-                f"{generator_model} → {critic_model}"
-                if generator_model and critic_model
-                else model
-            ),
+            model=model,
+            generator_model=generator_model,
+            critic_model=critic_model,
             duration_ms=duration_ms,
             created_at=created_at,
         )

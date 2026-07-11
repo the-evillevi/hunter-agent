@@ -15,6 +15,20 @@ SCORING_PROMPT_PATH = PROJECT_ROOT / "app" / "prompts" / "resume_scoring.txt"
 FALLBACK_SCORE = 50
 
 
+class ScoringPayload(BaseModel):
+    """The only shape the local model may return: score and reasoning.
+
+    Deliberately excludes ``is_fallback`` — that audit flag is set by our
+    code alone, never by model output (schema-guided decoding would
+    otherwise let job text steer the model into forging it).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    score: int = Field(ge=0, le=100)
+    reasoning: str = Field(min_length=1)
+
+
 class ScoringResult(BaseModel):
     """One validated local relevance judgement."""
 
@@ -64,10 +78,15 @@ class ResumeItemScorer:
             response = await self.provider.complete(
                 CompletionRequest(
                     prompt=payload.render_prompt(),
-                    response_schema=ScoringResult.model_json_schema(),
+                    response_schema=ScoringPayload.model_json_schema(),
                 )
             )
-            result = ScoringResult.model_validate_json(response.text)
+            parsed = ScoringPayload.model_validate_json(response.text)
+            result = ScoringResult(
+                score=parsed.score,
+                reasoning=parsed.reasoning,
+                is_fallback=False,
+            )
         except (AIProviderError, ValidationError, ValueError, TypeError) as error:
             return ScoringResult(
                 score=FALLBACK_SCORE,

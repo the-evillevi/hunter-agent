@@ -32,7 +32,7 @@ from app.services.resume_crud import (
     update_section_order,
 )
 from app.services.resume_import import ResumeDocument, import_resume
-from app.services.resume_tailor import ResumeTailor
+from app.services.resume_tailor import NoTailorableContentError, ResumeTailor
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -212,6 +212,15 @@ async def _render_tailoring_result(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except NoTailorableContentError as error:
+        # Not a provider problem: the resume simply has nothing relevant
+        # enough for this job, and the user should read that plainly.
+        return templates.TemplateResponse(
+            request,
+            "_resume_tailoring_error.html",
+            {"provider": None, "message": str(error)},
+            status_code=422,
+        )
     except AIProviderError as error:
         return templates.TemplateResponse(
             request,
