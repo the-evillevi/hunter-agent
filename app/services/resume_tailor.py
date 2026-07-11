@@ -53,7 +53,12 @@ SectionSelection = tuple[ResumeSectionDetail, ScoredItems, ScoredItems]
 
 
 class ResumeTailor:
-    """Score locally, draft and critique in OpenAI, then persist one variant."""
+    """Score locally, draft and critique in the cloud, then persist one variant.
+
+    The generator and critic come from configuration ([ai.generator] /
+    [ai.critic]); any provider behind the completion protocol can fill
+    either role, so swapping the pairing needs no code changes.
+    """
 
     def __init__(
         self,
