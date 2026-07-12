@@ -8,7 +8,6 @@ MockTransport, so nothing here ever needs a live server.
 """
 
 import json
-import math
 import time
 from typing import Any, Literal
 
@@ -17,7 +16,7 @@ import httpx
 from app.models.config import OllamaConfig
 from app.services.ai.completion import CompletionRequest, CompletionResponse
 from app.services.ai.errors import AIResponseError
-from app.services.ai.http import post_json
+from app.services.ai.http import post_json, validate_timeout
 
 
 PROVIDER_NAME = "ollama"
@@ -58,8 +57,7 @@ class OllamaCompletionProvider:
             role_config = config.tailor
         else:
             raise ValueError(f"unsupported Ollama role: {role!r}")
-        if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
-            raise ValueError("Ollama timeout must be finite and positive")
+        validate_timeout(timeout_seconds, "Ollama")
         self.model = role_config.model
         self._base_url = str(config.base_url).rstrip("/")
         self._temperature = role_config.temperature

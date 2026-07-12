@@ -1,46 +1,36 @@
 """HTTP tests for the resume management routes."""
 
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from sqlmodel import Session
 
 from app.routes import resumes as resumes_route
-from app.services.ollama_client import ScoringResult
+from app.services.ai.completion import CompletionRequest, CompletionResponse
+from app.services.ai.errors import AIConnectError
 from app.services.resume_import import import_resume, load_resume_document
+from app.services.resume_scoring import ResumeItemScorer
 from app.services.resume_tailor import ResumeTailor
-
-
-FIXTURE_PATH = Path(__file__).parent / "fixtures" / "resume_sample.json"
-
-
-class FakeScoringClient:
-    """Deterministic scorer so route tests never touch a real model."""
-
-    model_name = "fake-model"
-    prompt_version = "test"
-
-    def score_item(
-        self, *, item_content: str, job_title: str, job_description: str
-    ) -> ScoringResult:
-        score = 90 if "IBM" in item_content else 20
-        return ScoringResult(score=score, reasoning="Route test judgement.")
+from tailoring_fakes import (
+    RESUME_FIXTURE_PATH,
+    FakeCompletionProvider,
+    build_tailor,
+    generator_responder,
+)
 
 
 @pytest.fixture()
 def imported_resume_id(session: Session) -> int:
-    document = load_resume_document(FIXTURE_PATH)
+    document = load_resume_document(RESUME_FIXTURE_PATH)
     return import_resume(session, document).id
 
 
 @pytest.fixture()
 def fake_tailor(monkeypatch):
     """Replace the route's ResumeTailor with one using the fake scorer."""
-
-    def build_fake_tailor() -> ResumeTailor:
-        return ResumeTailor(client=FakeScoringClient())
-
-    monkeypatch.setattr(resumes_route, "ResumeTailor", build_fake_tailor)
+    monkeypatch.setattr(resumes_route, "ResumeTailor", build_tailor)
 
 
 def test_resumes_page_lists_imported_resume(client, imported_resume_id) -> None:
@@ -124,6 +114,40 @@ def test_tailor_route_returns_404_for_missing_job(
     )
 
     assert response.status_code == 404
+
+
+def test_tailor_route_shows_cloud_failure_without_saving_variant(
+    client,
+    session,
+    imported_resume_id,
+    create_job,
+    monkeypatch,
+) -> None:
+    class FailingGenerator(FakeCompletionProvider):
+        async def complete(self, request: CompletionRequest) -> CompletionResponse:
+            raise AIConnectError(
+                "cloud unavailable",
+                provider=self.provider_name,
+                model=self.model,
+            )
+
+    def build_failing_tailor() -> ResumeTailor:
+        tailor = build_tailor()
+        tailor.generator = FailingGenerator("openai", "gpt-5.5", generator_responder)
+        return tailor
+
+    monkeypatch.setattr(resumes_route, "ResumeTailor", build_failing_tailor)
+    job = create_job(title="Data Engineer")
+
+    response = client.post(
+        f"/resumes/{imported_resume_id}/tailor",
+        content=f"job_id={job.id}",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+
+    assert response.status_code == 503
+    assert "Tailoring could not be completed" in response.text
+    assert "resume was not modified" in response.text
 
 
 def test_export_json_downloads_custom_schema(client, imported_resume_id) -> None:
@@ -262,7 +286,7 @@ def test_patch_resume_returns_404_for_missing_profile(client) -> None:
 
 def test_patch_resume_rejects_foreign_item(client, session) -> None:
     """Editing an item through another profile's PATCH must fail."""
-    document = load_resume_document(FIXTURE_PATH)
+    document = load_resume_document(RESUME_FIXTURE_PATH)
     first = import_resume(session, document)
     second = import_resume(session, document)
 
@@ -348,4 +372,5 @@ def test_dashboard_shows_recent_tailor_runs_card(
     partial = client.get("/resumes/partials/recent")
     assert partial.status_code == 200
     assert "tailored-data-engineer-" in partial.text
+    assert "gpt-5.5 / gpt-5.5" in " ".join(partial.text.split())
     assert "<html" not in partial.text  # fragment, not a full page

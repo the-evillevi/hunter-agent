@@ -103,6 +103,42 @@ class OllamaConfig(StrictConfigModel):
     tailor: OllamaModelConfig
 
 
+class CloudModelConfig(StrictConfigModel):
+    """One cloud completion provider/model assignment.
+
+    ``temperature`` is optional because the current frontier defaults
+    (claude-opus-4-8, gpt-5.5) reject sampling parameters outright; None
+    means "let the provider use its own default". The 0-2 bound matches
+    the completion protocol; Anthropic's own 0-1 cap is enforced by its
+    adapter.
+    """
+
+    provider: Literal["anthropic", "openai"]
+    model: str = Field(min_length=1)
+    temperature: float | None = Field(default=None, ge=0, le=2)
+    max_tokens: int = Field(gt=0)
+
+    @field_validator("model")
+    @classmethod
+    def model_must_not_be_blank(cls, model: str) -> str:
+        """Normalize model identities used for audit metadata and requests."""
+        model = model.strip()
+        if not model:
+            raise ValueError("cloud model name cannot be blank")
+        return model
+
+
+class CloudAIConfig(StrictConfigModel):
+    """Cloud model assignments for the CV tailoring roles.
+
+    Role assignment is data, not code: any configured provider/model can
+    fill either role, including the same provider in both.
+    """
+
+    generator: CloudModelConfig
+    critic: CloudModelConfig
+
+
 class AdzunaSourceConfig(StrictConfigModel):
     """Adzuna source settings."""
 
@@ -231,6 +267,7 @@ class AppConfig(StrictConfigModel):
     agent: AgentConfig
     scheduler: SchedulerConfig
     ollama: OllamaConfig
+    ai: CloudAIConfig
     sources: SourcesConfig
     application: ApplicationConfig
 

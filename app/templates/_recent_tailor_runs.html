@@ -19,7 +19,14 @@
               </a>
             </td>
             <td>{{ run.job_title }}</td>
-            <td>{{ run.model }}</td>
+            <td>
+              {% if run.generator_model and run.critic_model %}
+                {{ run.generator_model }}
+                / {{ run.critic_model }}
+              {% else %}
+                {{ run.model }}
+              {% endif %}
+            </td>
             <td>{{ run.duration_ms }} ms</td>
             <td>{{ run.created_at }}</td>
           </tr>

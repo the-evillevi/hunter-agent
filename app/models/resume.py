@@ -155,8 +155,18 @@ class ResumeTailorRun(SQLModel, table=True):
         )
     )
     job_id: int = Field(foreign_key="jobs.id")
+    # Local relevance-scoring identity remains separate from the two cloud
+    # writing roles so cost and behavior stay attributable by workload.
     model: str
     prompt_version: str
+    generator_provider: str | None = None
+    generator_model: str | None = None
+    critic_provider: str | None = None
+    critic_model: str | None = None
+    generator_prompt_version: str | None = None
+    critic_prompt_version: str | None = None
+    critique_summary: str | None = None
+    guard_diagnostics: str | None = None
     # Wall-clock time of the whole run (scoring plus variant writes).
     duration_ms: int = 0
     created_at: datetime = Field(default_factory=datetime.now)
@@ -226,7 +236,11 @@ class ResumeExportProfile(SQLModel, table=True):
 
 
 class RecentTailorRun(SQLModel):
-    """Display shape for one row in the dashboard's recent-tailoring card."""
+    """Display shape for one row in the dashboard's recent-tailoring card.
+
+    ``model`` is the local relevance scorer; the cloud writing roles stay
+    separate fields so each workload remains attributable in the UI.
+    """
 
     run_id: int
     resume_id: int
@@ -234,6 +248,8 @@ class RecentTailorRun(SQLModel):
     job_id: int
     job_title: str
     model: str
+    generator_model: str | None = None
+    critic_model: str | None = None
     duration_ms: int
     created_at: datetime
 

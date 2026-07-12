@@ -41,6 +41,29 @@ max_tokens = 2048     # full CV section rewrites
 
 
 # ============================================================
+# CLOUD AI - CV TAILORING
+# API keys are read only from environment variables:
+# ANTHROPIC_API_KEY and OPENAI_API_KEY. Either provider can fill
+# either role; swap the pairing here, no code changes needed.
+# ============================================================
+
+# No temperature entries: claude-opus-4-8 and gpt-5.5 reject sampling
+# parameters, so the adapters omit them unless explicitly configured.
+
+[ai.generator]
+provider = "anthropic"
+model = "claude-opus-4-8"
+max_tokens = 4096
+
+[ai.critic]
+provider = "openai"
+model = "gpt-5.5"
+# The Responses-API budget includes invisible reasoning tokens; too small
+# a budget can burn entirely on reasoning and return no visible text.
+max_tokens = 8192
+
+
+# ============================================================
 # JOB SOURCES
 # Toggle sources on/off without touching code.
 # ============================================================
