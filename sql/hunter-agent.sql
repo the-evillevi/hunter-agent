@@ -325,6 +325,14 @@ CREATE TABLE resume_tailor_runs (
   job_id INTEGER NOT NULL REFERENCES jobs (id),
   model TEXT NOT NULL,
   prompt_version TEXT NOT NULL,
+  generator_provider TEXT,
+  generator_model TEXT,
+  critic_provider TEXT,
+  critic_model TEXT,
+  generator_prompt_version TEXT,
+  critic_prompt_version TEXT,
+  critique_summary TEXT,
+  guard_diagnostics TEXT,
   duration_ms INTEGER NOT NULL DEFAULT 0,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
