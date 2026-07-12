@@ -1,0 +1,57 @@
+<!-- Recent pipeline runs (HNTR-51): one row per run from pipeline_runs. -->
+<p class="text-base-content/60 mb-2 text-sm">
+  {% if next_run_time %}
+    Next scheduled run: {{ next_run_time.strftime("%Y-%m-%d %H:%M %Z") }}
+  {% else %}
+    Scheduler disabled
+  {% endif %}
+</p>
+
+{% if pipeline_runs %}
+  <div class="overflow-x-auto">
+    <table class="table-zebra table text-sm">
+      <thead>
+        <tr>
+          <th>Started</th>
+          <th>Trigger</th>
+          <th>Status</th>
+          <th>Discovered</th>
+          <th>Persisted</th>
+          <th>Duplicates</th>
+          <th>Scored</th>
+          <th>Rejected</th>
+          <th>Failed</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in pipeline_runs %}
+          <tr>
+            <td>{{ run.started_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td>{{ run.trigger_type }}</td>
+            <td>
+              {% if run.status == "success" %}
+                <span class="badge badge-success">success</span>
+              {% elif run.status == "partial" %}
+                <span class="badge badge-warning">partial</span>
+              {% elif run.status == "skipped_overlap" %}
+                <span class="badge badge-ghost">skipped (overlap)</span>
+              {% elif run.status == "skipped_misfire" %}
+                <span class="badge badge-ghost">skipped (misfire)</span>
+              {% else %}
+                <span class="badge badge-error">failure</span>
+              {% endif %}
+            </td>
+            <td>{{ run.discovered_count }}</td>
+            <td>{{ run.persisted_count }}</td>
+            <td>{{ run.duplicates_count }}</td>
+            <td>{{ run.scored_count }}</td>
+            <td>{{ run.rejected_count }}</td>
+            <td>{{ run.failed_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="text-base-content/60 text-sm">No pipeline runs yet.</p>
+{% endif %}

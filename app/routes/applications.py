@@ -7,9 +7,11 @@ from sqlmodel import Session
 
 from app.db.database import get_session
 from app.models.application import ApplicationStatus
+from app.routes.forms import form_field
 from app.services.applications import (
     APPLICATION_STATUS_ORDER,
     list_applications,
+    update_application_notes,
     update_application_status,
 )
 
@@ -65,6 +67,42 @@ async def update_application_status_card(
             session,
             application_id=application_id,
             status=status,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    return templates.TemplateResponse(
+        request,
+        "_application_card.html",
+        {
+            "application": application,
+            "application_statuses": APPLICATION_STATUS_ORDER,
+        },
+    )
+
+
+@router.patch(
+    "/applications/{application_id}/notes",
+    response_class=HTMLResponse,
+    include_in_schema=False,
+)
+async def update_application_notes_card(
+    application_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """Save (or clear) one application's notes and render its card.
+
+    Blank submissions must survive parsing (form_field keeps them) so an
+    emptied textarea clears the stored notes.
+    """
+    notes = await form_field(request, "notes")
+
+    try:
+        application = update_application_notes(
+            session,
+            application_id=application_id,
+            notes=notes,
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

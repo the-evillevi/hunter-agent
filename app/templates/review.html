@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="card border-base-300 bg-base-100 border shadow-sm">
+    <div class="card-body">
+      <div>
+        <h2 class="card-title text-2xl">Review queue</h2>
+        <p class="text-base-content/60 mt-1 text-sm">
+          Scored jobs with their evidence and outcomes: decide what becomes an
+          application draft.
+        </p>
+      </div>
+
+      <form
+        class="mt-2 flex flex-wrap items-end gap-3"
+        method="get"
+        action="/review"
+        hx-get="/review/partials/table"
+        hx-target="#review-table"
+        hx-swap="innerHTML"
+      >
+        <label class="form-control">
+          <span class="label-text">Profile</span>
+          <select class="select select-bordered select-sm" name="profile_id">
+            <option value="">All profiles</option>
+            {% for detail in profiles %}
+              <option
+                value="{{ detail.profile.id }}"
+                {% if profile_id == detail.profile.id %}selected{% endif %}
+              >
+                {{ detail.profile.role_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+
+        <label class="form-control">
+          <span class="label-text">Minimum score</span>
+          <input
+            class="input input-bordered input-sm w-24"
+            type="number"
+            name="min_score"
+            min="0"
+            max="100"
+            value="{{ min_score if min_score is not none else '' }}"
+          />
+        </label>
+
+        <!-- No hidden sort state here: header clicks update only the
+             table fragment, so a copy in the form would go stale and
+             silently revert the user's sort. Filtering resets to the
+             default score ordering instead. -->
+        <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+      </form>
+
+      <div id="review-table" class="mt-4">
+        {% include "_review_table.html" %}
+      </div>
+    </div>
+  </section>
+{% endblock %}

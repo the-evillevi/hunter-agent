@@ -92,4 +92,40 @@
       </div>
     </div>
   </section>
+
+  <section class="card border-base-300 bg-base-100 mt-4 border shadow-sm">
+    <div class="card-body">
+      <div
+        class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <div>
+          <h2 class="card-title">Pipeline runs</h2>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            type="button"
+            class="btn btn-primary"
+            hx-post="/pipeline/run"
+            hx-target="#pipeline-run-result"
+            hx-swap="innerHTML"
+          >
+            Run now
+          </button>
+          <button
+            type="button"
+            class="btn btn-ghost"
+            hx-get="/pipeline/partials/runs"
+            hx-target="#pipeline-runs"
+            hx-swap="innerHTML"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
+
+      <div id="pipeline-run-result"></div>
+      <div id="pipeline-runs">{% include "_pipeline_runs.html" %}</div>
+    </div>
+  </section>
 {% endblock %}

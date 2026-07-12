@@ -7,10 +7,16 @@ schema per test is intentionally simple to understand and maintain; the suite is
 small enough that the clarity is worth more than transaction-level reuse.
 """
 
+import os
 from collections.abc import Callable, Iterator
 from datetime import datetime
 
 import pytest
+
+# Every TestClient(app) startup runs the app lifespan; without this guard it
+# would boot a real APScheduler from config.toml in every route test. The
+# variable is read at lifespan time, so setting it here covers the suite.
+os.environ.setdefault("HUNTER_SCHEDULER_ENABLED", "0")
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlmodel import SQLModel, Session, create_engine, select
@@ -18,12 +24,14 @@ from sqlmodel import SQLModel, Session, create_engine, select
 from app.db.database import get_session
 from app.main import app
 from app.models.application import Application, ApplicationStatus
+from app.models.blacklist import Blacklist  # noqa: F401
 from app.models.company import Company
 from app.models.job import Job
 from app.models.location import Location
 from app.models.profile import LocationType, Profile
 
-# Register score-history tables before each isolated schema is created.
+# Register audit-history tables before each isolated schema is created.
+from app.models.pipeline_run import PipelineRun  # noqa: F401
 from app.models.score_run import ScoreLayerResultRow, ScoreRun  # noqa: F401
 from app.models.source import Source
 from app.services.profiles import ProfileDetail
@@ -167,6 +175,36 @@ def create_job(session: Session) -> Callable[..., Job]:
         return job
 
     return _create_job
+
+
+@pytest.fixture()
+def create_score_run(session: Session) -> Callable[..., "ScoreRun"]:
+    """Insert one score run for a job, shared by review-queue tests."""
+
+    def _create_score_run(
+        job,
+        *,
+        status: str = "scored",
+        score: int | None = 80,
+        warnings: list[str] | None = None,
+    ) -> ScoreRun:
+        import json
+
+        run = ScoreRun(
+            job_id=job.id,
+            profile_id=job.profile_id,
+            pipeline_version="1",
+            weights_version="1",
+            status=status,
+            score=score if status == "scored" else None,
+            warnings=json.dumps(warnings or []),
+        )
+        session.add(run)
+        session.commit()
+        session.refresh(run)
+        return run
+
+    return _create_score_run
 
 
 @pytest.fixture()

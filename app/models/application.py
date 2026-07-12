@@ -43,6 +43,8 @@ class ApplicationListItem(SQLModel):
     """
 
     id: int
+    job_id: int
+    company_id: int
     job_title: str
     company: str
     cv_path: str | None
@@ -52,3 +54,6 @@ class ApplicationListItem(SQLModel):
     notes: str | None
     resume_id: int | None = None
     resume_name: str | None = None
+    blacklisted: bool = False
+    blacklist_kind: str | None = None  # "job" or "company" when blacklisted
+    blacklist_reason: str | None = None

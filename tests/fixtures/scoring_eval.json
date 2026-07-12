@@ -1,0 +1,289 @@
+{
+  "schema_version": 1,
+  "profile": {
+    "role_name": "AI/ML Engineer",
+    "keywords": [
+      "Python",
+      "machine learning",
+      "LLM",
+      "FastAPI",
+      "MLOps",
+      "PyTorch"
+    ],
+    "exclude_keywords": ["blockchain", "staffing agency"],
+    "location_types": ["remote"],
+    "salary_min": 0
+  },
+  "jobs": [
+    {
+      "id": "ml-engineer-remote",
+      "title": "Machine Learning Engineer (Python)",
+      "description": "Build and deploy machine learning models in Python. You will own MLOps pipelines, serve models behind FastAPI, and fine-tune LLM systems in PyTorch.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "Dense keyword overlap, fully remote, exactly the target role"
+    },
+    {
+      "id": "llm-platform-engineer",
+      "title": "LLM Platform Engineer",
+      "description": "Design retrieval pipelines and evaluation harnesses for LLM products. Strong Python required; we deploy with FastAPI and track experiments with MLOps tooling.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "LLM-focused platform work with the core stack"
+    },
+    {
+      "id": "senior-ml-engineer",
+      "title": "Senior Machine Learning Engineer",
+      "description": "Lead machine learning projects end to end: data pipelines, PyTorch training, and production serving in Python. Remote-first team.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "Senior variant of the target role, remote-first"
+    },
+    {
+      "id": "mlops-engineer",
+      "title": "MLOps Engineer",
+      "description": "Own the model lifecycle: CI/CD for machine learning, feature stores, monitoring, and Python automation across training and serving.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "MLOps specialization still squarely in scope"
+    },
+    {
+      "id": "applied-ai-engineer",
+      "title": "Applied AI Engineer",
+      "description": "Ship LLM features to production: prompt pipelines, evaluations, and FastAPI services in Python.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "Applied LLM engineering with the exact stack"
+    },
+    {
+      "id": "ml-engineer-nlp",
+      "title": "Machine Learning Engineer, NLP",
+      "description": "Train and evaluate transformer models in PyTorch, build Python data tooling, and deploy inference services.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "NLP flavor of the target role"
+    },
+    {
+      "id": "ai-infra-engineer",
+      "title": "AI Infrastructure Engineer (Python)",
+      "description": "Scale LLM inference and machine learning training clusters. Python, PyTorch, and strong MLOps practices.",
+      "location": "Remote",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "Infra-leaning but keyword-dense and remote"
+    },
+    {
+      "id": "ml-engineer-no-location",
+      "title": "Machine Learning Engineer",
+      "description": "Python machine learning role: models, pipelines, and LLM integrations with FastAPI.",
+      "location": "CDMX",
+      "bucket": "clear_match",
+      "human_label": 2,
+      "note": "Target role; location names no work arrangement so it stays unknown"
+    },
+    {
+      "id": "data-scientist-generalist",
+      "title": "Data Scientist",
+      "description": "Analyze product data in Python, build dashboards, and occasionally prototype machine learning models.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Some ML and Python but analysis-first"
+    },
+    {
+      "id": "backend-fastapi",
+      "title": "Backend Engineer (FastAPI)",
+      "description": "Build REST APIs with FastAPI and Python. No ML responsibilities, but the team serves model endpoints.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Right stack, adjacent to ML but not an ML role"
+    },
+    {
+      "id": "data-engineer-pipelines",
+      "title": "Data Engineer",
+      "description": "Design ETL pipelines in Python feeding machine learning teams. Airflow, dbt, and warehouse modeling.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Feeds ML teams; transferable but not the target"
+    },
+    {
+      "id": "research-scientist",
+      "title": "Research Scientist, Deep Learning",
+      "description": "Publish research on novel architectures in PyTorch. PhD required.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Research-heavy; PyTorch overlaps but the day job differs"
+    },
+    {
+      "id": "analytics-engineer",
+      "title": "Analytics Engineer",
+      "description": "SQL-first modeling with some Python scripting. Support experimentation and reporting.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Mostly SQL; Python is secondary"
+    },
+    {
+      "id": "platform-engineer-k8s",
+      "title": "Platform Engineer",
+      "description": "Kubernetes, Terraform, and Python automation for a team that also runs MLOps workloads.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "Infra role that brushes against MLOps"
+    },
+    {
+      "id": "solutions-engineer-ai",
+      "title": "Solutions Engineer, AI Products",
+      "description": "Customer-facing role demoing LLM products and writing Python integration examples.",
+      "location": "Remote",
+      "bucket": "ambiguous",
+      "human_label": 1,
+      "note": "AI-adjacent but customer-facing, not engineering-first"
+    },
+    {
+      "id": "frontend-react",
+      "title": "Frontend Engineer (React)",
+      "description": "Build UI components in React and TypeScript. CSS craftsmanship valued.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "No overlap with the profile at all"
+    },
+    {
+      "id": "account-executive",
+      "title": "Account Executive",
+      "description": "Own a sales pipeline and close enterprise deals.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Sales role; zero technical overlap"
+    },
+    {
+      "id": "java-enterprise",
+      "title": "Senior Java Engineer",
+      "description": "Spring Boot microservices and Oracle integrations.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Different language and domain"
+    },
+    {
+      "id": "recruiter-tech",
+      "title": "Technical Recruiter",
+      "description": "Source and screen engineering candidates.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Recruiting, not engineering"
+    },
+    {
+      "id": "qa-manual",
+      "title": "Manual QA Tester",
+      "description": "Execute regression test plans and file bug reports.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Manual QA; no Python or ML"
+    },
+    {
+      "id": "devops-windows",
+      "title": "Windows Systems Administrator",
+      "description": "Manage Active Directory, Exchange, and Windows Server fleets.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Sysadmin role outside the stack"
+    },
+    {
+      "id": "copywriter-marketing",
+      "title": "Marketing Copywriter",
+      "description": "Write landing pages and email campaigns.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Content role; nothing technical"
+    },
+    {
+      "id": "embedded-c",
+      "title": "Embedded Firmware Engineer (C)",
+      "description": "Bare-metal C on ARM microcontrollers for industrial sensors.",
+      "location": "Remote",
+      "bucket": "clear_reject",
+      "human_label": 0,
+      "note": "Embedded C; unrelated despite being engineering"
+    },
+    {
+      "id": "blockchain-ml",
+      "title": "Machine Learning Engineer, Blockchain Analytics",
+      "description": "Apply machine learning in Python to on-chain data. Blockchain experience required.",
+      "location": "Remote",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Excluded keyword blockchain despite strong ML text"
+    },
+    {
+      "id": "staffing-agency-ml",
+      "title": "ML Engineer (via staffing agency)",
+      "description": "Our staffing agency is hiring a machine learning engineer for a client project in Python.",
+      "location": "Remote",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Excluded phrase staffing agency"
+    },
+    {
+      "id": "onsite-ml-engineer",
+      "title": "Machine Learning Engineer",
+      "description": "Python machine learning role with PyTorch and MLOps ownership.",
+      "location": "Onsite - Berlin",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Great text but onsite-only conflicts with remote profile"
+    },
+    {
+      "id": "hybrid-data-ml",
+      "title": "Machine Learning Engineer (Hybrid)",
+      "description": "Hybrid schedule: 3 days in office. Python, PyTorch, LLM serving.",
+      "location": "Hybrid - CDMX",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Hybrid arrangement conflicts with remote-only profile"
+    },
+    {
+      "id": "onsite-frontend",
+      "title": "Frontend Engineer",
+      "description": "React and TypeScript UI work.",
+      "location": "Onsite - Monterrey",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Onsite and irrelevant; doubly out"
+    },
+    {
+      "id": "blockchain-frontend",
+      "title": "Web3 Frontend Engineer",
+      "description": "Build blockchain wallet UIs in React.",
+      "location": "Remote",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Excluded keyword blockchain on an irrelevant role"
+    },
+    {
+      "id": "staffing-agency-generic",
+      "title": "Software Engineer (contract)",
+      "description": "Contract role placed through our staffing agency; various client stacks.",
+      "location": "Remote",
+      "bucket": "hard_filter",
+      "human_label": 0,
+      "note": "Excluded phrase staffing agency on a generic role"
+    }
+  ]
+}

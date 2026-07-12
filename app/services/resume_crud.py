@@ -280,6 +280,11 @@ def update_section_order(
     return section
 
 
+def list_base_resumes(session: Session) -> list[ResumeListItem]:
+    """Master resumes only: tailoring a tailored variant compounds filtering."""
+    return [resume for resume in list_resumes(session) if resume.base_resume_id is None]
+
+
 def list_recent_tailor_runs(session: Session, limit: int = 5) -> list[RecentTailorRun]:
     """Return the newest tailoring runs for the dashboard card."""
     statement = (
